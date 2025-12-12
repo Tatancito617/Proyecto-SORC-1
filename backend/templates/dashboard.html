@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SORC</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<div id="modalAgricultor" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('modalAgricultor')">&times;</span>
+        <h2>Nuevo Agricultor</h2>
+        <form action="/add/agricultor" method="POST" style="margin-top: 20px;">
+            <div class="form-group"><label>Nombre</label><input name="nombre" class="form-control" required></div>
+            <div class="form-group"><label>Apellido</label><input name="apellido" class="form-control" required></div>
+            <div class="form-group"><label>Email</label><input type="email" name="email" class="form-control" required></div>
+            <div class="form-group"><label>Ubicación</label><input name="ubicacion" class="form-control" required></div>
+            <button type="submit" class="iniciar-button" style="width:100%; padding:10px; font-size:1rem;">Guardar</button>
+        </form>
+    </div>
+</div>
+
+<div id="modalParcela" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('modalParcela')">&times;</span>
+        <h2>Nueva Parcela</h2>
+        <form action="/add/parcela" method="POST" style="margin-top: 20px;">
+            <div class="form-group"><label>Nombre Parcela</label><input name="nombre" class="form-control" required></div>
+            <div class="form-group"><label>Superficie (ha)</label><input type="number" step="0.01" name="superficie" class="form-control" required></div>
+            <button type="submit" class="iniciar-button" style="width:100%; padding:10px; font-size:1rem;">Guardar</button>
+        </form>
+    </div>
+</div>
+
+<div id="modalSensor" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('modalSensor')">&times;</span>
+        <h2>Nuevo Sensor</h2>
+        <form action="/add/sensor" method="POST" style="margin-top: 20px;">
+            <div class="form-group"><label>ID Sensor (Chip ID)</label><input name="sensor_id" class="form-control" placeholder="Ej: ESP32_005" required></div>
+            <div class="form-group"><label>Ubicación</label><input name="ubicacion" class="form-control" placeholder="Ej: Sector Norte" required></div>
+            <button type="submit" class="iniciar-button" style="width:100%; padding:10px; font-size:1rem;">Guardar</button>
+        </form>
+    </div>
+</div>
+
+<body>
+    <div class="main-app">
+        <aside class="sidebar">
+            <div class="sidebar-logo">🌱 SORC</div>
+            <nav>
+                <button class="nav-item active" data-view="dashboard">
+                    <span style="font-size: 1.2rem;">🏠</span> 
+                    <span>Inicio</span>
+                </button>
+                
+                <button class="nav-item" data-view="agricultores">
+                    <span style="font-size: 1.2rem;">👨‍🌾</span>
+                    <span>Agri</span>
+                </button>
+                
+                <button class="nav-item" data-view="parcelas">
+                    <span style="font-size: 1.2rem;">🌾</span>
+                    <span>Parcelas</span>
+                </button>
+                
+                <button class="nav-item" data-view="sensores">
+                    <span style="font-size: 1.2rem;">📡</span>
+                    <span>Sensores</span>
+                </button>
+                
+                <button class="nav-item" data-view="lecturas">
+                    <span style="font-size: 1.2rem;">📊</span>
+                    <span>Lecturas</span>
+                </button>
+
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="header">
+                <div>Bienvenido, Administrador</div>
+                <div id="currentDateTime"></div>
+            </header>
+            
+            <div id="dashboard" class="view active">
+                <h2>Resumen General</h2>
+                <div class="dashboard-grid" style="margin-top: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ n_agricultores }}</div>
+                        <div class="stat-label">Agricultores</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ n_parcelas }}</div>
+                        <div class="stat-label">Parcelas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ n_sensores }}</div>
+                        <div class="stat-label">Sensores Activos</div>
+                    </div>
+                </div>
+            </div>
+<div id="agricultores" class="view">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>👨‍🌾 Gestión de Agricultores</h2>
+        <button class="btn--primary" onclick="openModal('modalAgricultor')">+ Nuevo Agricultor</button>
+    </div>
+    <div class="card">
+        <table class="table">
+            <thead>
+                <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Ubicación</th></tr>
+            </thead>
+            <tbody>
+                {% for agri in agricultores %}
+                <tr>
+                    <td>{{ agri.agricultor_id }}</td>
+                    <td>{{ agri.nombre }} {{ agri.apellido }}</td>
+                    <td>{{ agri.email }}</td>
+                    <td>{{ agri.ubicacion }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">No hay agricultores registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="parcelas" class="view">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>🌾 Mis Parcelas</h2>
+        <button class="btn--primary" onclick="openModal('modalParcela')">+ Nueva Parcela</button>
+    </div>
+    <div class="dashboard-grid">
+        {% for p in parcelas %}
+        <div class="stat-card" style="border-left: 5px solid var(--primary-green);">
+            <h3 style="margin-bottom: 10px;">{{ p.nombre }}</h3>
+            <p><strong>Superficie:</strong> {{ p.superficie_ha }} ha</p>
+            <p><strong>ID Sistema:</strong> #{{ p.parcela_id }}</p>
+        </div>
+        {% else %}
+        <p>No hay parcelas registradas.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="sensores" class="view">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>📡 Sensores</h2>
+        <button class="btn--primary" onclick="openModal('modalSensor')">+ Nuevo Sensor</button>
+    </div>
+    <div class="card">
+        <table class="table">
+            <thead><tr><th>ID Chip</th><th>Ubicación</th><th>Fecha Instalación</th></tr></thead>
+            <tbody>
+                {% for s in sensores %}
+                <tr>
+                    <td><strong>{{ s.sensor_id }}</strong></td>
+                    <td>{{ s.ubicacion }}</td>
+                    <td>{{ s.fecha_instalacion }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3">No hay sensores registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+            <div id="lecturas" class="view">
+                <h2>Últimas Lecturas de Sensores</h2>
+                <div style="margin-top: 20px;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID Lectura</th>
+                                <th>Sensor</th>
+                                <th>Temperatura</th>
+                                <th>Humedad</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dato in tabla_lecturas %}
+                            <tr>
+                                <td>#{{ dato.lectura_id }}</td>
+                                <td>{{ dato.sensor_id }}</td>
+                                <td>{{ dato.temperatura }}°C</td>
+                                <td>{{ dato.humedad_suelo }}%</td>
+                                <td>{{ dato.fecha_registro }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" style="text-align: center;">No hay datos registrados aún.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
