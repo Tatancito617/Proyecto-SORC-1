@@ -101,29 +101,95 @@
                 </div>
             </div>
 <div id="agricultores" class="view">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>👨‍🌾 Gestión de Agricultores</h2>
-        <button class="btn--primary" onclick="openModal('modalAgricultor')">+ Nuevo Agricultor</button>
+    
+    <div id="panel-lista-agricultores">
+        <div class="header-flex">
+            <h2>👨‍🌾 Mis Agricultores</h2>
+            <button class="btn--primary" onclick="openModal('modalAgricultor')">+ Nuevo</button>
+        </div>
+        
+        <div class="list-group">
+            {% for agri in agricultores %}
+            <div class="card card-hover" onclick="verParcelasDe('{{ agri.nombre }}', {{ agri.agricultor_id }})">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3>{{ agri.nombre }} {{ agri.apellido }}</h3>
+                        <p style="color: #666; font-size: 0.9rem;">📍 {{ agri.ubicacion }}</p>
+                    </div>
+                    <span style="font-size: 1.5rem;">👉</span>
+                </div>
+            </div>
+            {% else %}
+            <p>No hay agricultores registrados.</p>
+            {% endfor %}
+        </div>
     </div>
-    <div class="card">
-        <table class="table">
-            <thead>
-                <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Ubicación</th></tr>
-            </thead>
-            <tbody>
-                {% for agri in agricultores %}
-                <tr>
-                    <td>{{ agri.agricultor_id }}</td>
-                    <td>{{ agri.nombre }} {{ agri.apellido }}</td>
-                    <td>{{ agri.email }}</td>
-                    <td>{{ agri.ubicacion }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4">No hay agricultores registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+    <div id="panel-lista-parcelas" style="display: none;">
+        <button class="btn-back" onclick="mostrarNivel('agricultores')">⬅ Volver a Agricultores</button>
+        <h2 id="titulo-cliente" style="margin-top: 10px;">Parcelas de...</h2>
+        <p style="margin-bottom: 20px; color: #666;">Selecciona una parcela para ver lecturas y diagnosticar.</p>
+
+        <div id="contenedor-parcelas" class="dashboard-grid">
+            </div>
     </div>
+
+    <div id="panel-detalle-parcela" style="display: none;">
+        <button class="btn-back" onclick="mostrarNivel('parcelas')">⬅ Volver a Parcelas</button>
+        
+        <div class="card" style="margin-top: 15px; border-top: 5px solid var(--primary-green);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h2 id="det-nombre-parcela">Parcela Norte</h2>
+                    <span class="badge">Maíz</span>
+                </div>
+                <a id="btn-maps" href="#" target="_blank" class="btn-icon-map">
+                    🗺️ Ir
+                </a>
+            </div>
+
+            <div class="weather-widget">
+                <div class="weather-icon">⛅</div>
+                <div class="weather-info">
+                    <span class="temp">--°C</span>
+                    <span class="desc">Cargando clima...</span>
+                </div>
+            </div>
+
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+
+            <h3>📡 Lecturas del Sensor</h3>
+            <div class="sensor-grid">
+                <div class="sensor-box">
+                    <span class="icon">🌡️</span>
+                    <span class="value" id="val-temp">--°C</span>
+                    <span class="label">Suelo</span>
+                </div>
+                <div class="sensor-box">
+                    <span class="icon">💧</span>
+                    <span class="value" id="val-hum">--%</span>
+                    <span class="label">Humedad</span>
+                </div>
+                <div class="sensor-box">
+                    <span class="icon">🧪</span>
+                    <span class="value" id="val-ph">--</span>
+                    <span class="label">pH</span>
+                </div>
+            </div>
+
+            <div class="ai-section">
+                <h3>🤖 Recomendación Técnica</h3>
+                <p style="font-size: 0.9rem; color: #555;">Basado en clima y sensores actuales.</p>
+                
+                <div id="ai-result" class="ai-box" style="display:none;"></div>
+                
+                <button class="btn-ai" onclick="generarRecomendacion()">
+                    ✨ Generar Diagnóstico IA
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <div id="parcelas" class="view">

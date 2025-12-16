@@ -84,3 +84,86 @@ window.onclick = function(event) {
         event.target.classList.remove('show');
     }
 }
+
+// --- LÓGICA DE NAVEGACIÓN JERÁRQUICA ---
+
+let parcelaSeleccionada = null; // Guardará el ID para usarlo en la IA
+
+// 1. Función para cambiar entre niveles (Ocultar/Mostrar divs)
+function mostrarNivel(nivel) {
+    // Ocultar todo
+    document.getElementById('panel-lista-agricultores').style.display = 'none';
+    document.getElementById('panel-lista-parcelas').style.display = 'none';
+    document.getElementById('panel-detalle-parcela').style.display = 'none';
+
+    // Mostrar el deseado
+    if (nivel === 'agricultores') document.getElementById('panel-lista-agricultores').style.display = 'block';
+    if (nivel === 'parcelas') document.getElementById('panel-lista-parcelas').style.display = 'block';
+    if (nivel === 'detalle') document.getElementById('panel-detalle-parcela').style.display = 'block';
+}
+
+// 2. Al hacer clic en un Agricultor
+function verParcelasDe(nombreAgricultor, idAgricultor) {
+    document.getElementById('titulo-cliente').innerText = `Parcelas de ${nombreAgricultor}`;
+    const contenedor = document.getElementById('contenedor-parcelas');
+    
+    // AQUÍ PRONTO HAREMOS: fetch('/api/agricultor/' + id + '/parcelas')
+    // POR AHORA: Simulamos tarjetas para ver el diseño
+    contenedor.innerHTML = `
+        <div class="stat-card card-hover" onclick="verDetalleParcela(101, 'Parcela Los Pinos', -40.57, -73.13)">
+            <h3 style="color: var(--primary-green);">Parcela Los Pinos</h3>
+            <p>🌽 Maíz • 15 ha</p>
+            <button class="btn--primary" style="margin-top:10px; width:100%">Diagnosticar 🩺</button>
+        </div>
+        <div class="stat-card card-hover" onclick="verDetalleParcela(102, 'Parcela El Bajo', -40.60, -73.10)">
+            <h3 style="color: #e67e22;">Parcela El Bajo</h3>
+            <p>🌾 Trigo • 8 ha</p>
+            <button class="btn--primary" style="margin-top:10px; width:100%">Diagnosticar 🩺</button>
+        </div>
+    `;
+    
+    mostrarNivel('parcelas');
+}
+
+// 3. Al hacer clic en una Parcela (Vista Final)
+function verDetalleParcela(idParcela, nombre, lat, lon) {
+    parcelaSeleccionada = idParcela;
+    
+    // Llenar datos estáticos
+    document.getElementById('det-nombre-parcela').innerText = nombre;
+    
+    // Configurar Mapa
+    const linkMap = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+    document.getElementById('btn-maps').href = linkMap;
+
+    // SIMULAR CARGA DE DATOS (Backend)
+    // Pronto aquí harás: fetch('/api/parcela/' + id + '/full-data')
+    document.getElementById('val-temp').innerText = "22°C"; // Dato simulado
+    document.getElementById('val-hum').innerText = "45%";   // Dato simulado
+    document.getElementById('val-ph').innerText = "6.8";    // Dato simulado
+    
+    // Limpiar IA anterior
+    document.getElementById('ai-result').style.display = 'none';
+    
+    mostrarNivel('detalle');
+}
+
+// 4. Botón de IA
+function generarRecomendacion() {
+    const btn = document.querySelector('.btn-ai');
+    const caja = document.getElementById('ai-result');
+    
+    btn.disabled = true;
+    btn.innerText = "Pensando... 🧠";
+    
+    // Simulación de espera de API
+    setTimeout(() => {
+        caja.style.display = 'block';
+        caja.innerHTML = `
+            <strong>💡 Recomendación:</strong><br>
+            El pH de 6.8 es óptimo para el Maíz. Sin embargo, la humedad del 45% es baja considerando el clima despejado. Se recomienda riego por goteo esta tarde.
+        `;
+        btn.innerText = "✨ Generar Diagnóstico IA";
+        btn.disabled = false;
+    }, 2000);
+}
