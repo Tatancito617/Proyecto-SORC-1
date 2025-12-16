@@ -70,8 +70,69 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+let map, marker;
+
+// 1. INICIALIZAR MAPA (Llamar a esta función cuando se abra el modal)
+function initMap() {
+    // Si el mapa ya existe, no lo creamos de nuevo
+    if (map) return; 
+
+    // Coordenadas iniciales (Osorno)
+    map = L.map('mapaSelector').setView([-40.5725, -73.1353], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Evento: Al hacer clic en el mapa
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+
+        // Mover el marcador
+        if (marker) {
+            marker.setLatLng(e.latlng);
+        } else {
+            marker = L.marker(e.latlng).addTo(map);
+        }
+
+        // Llenar los inputs del formulario
+        document.getElementById('input_lat').value = lat.toFixed(6);
+        document.getElementById('input_lon').value = lng.toFixed(6);
+    });
+}
+
+// 2. BUSCADOR DE CIUDAD (Nominatim API - Gratis)
+async function buscarEnMapa() {
+    const query = document.getElementById('buscadorMapa').value;
+    if(!query) return;
+
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+            const lat = data[0].lat;
+            const lon = data[0].lon;
+            map.setView([lat, lon], 14); // Mover mapa al lugar encontrado
+        } else {
+            alert("Lugar no encontrado 😅");
+        }
+    } catch (error) {
+        console.error("Error buscando lugar:", error);
+    }
+}
+
 function openModal(modalId) {
     document.getElementById(modalId).classList.add('show');
+    
+    if(modalId === 'modalParcela') {
+        // Truco: Esperar un poco a que el modal sea visible para cargar el mapa
+        setTimeout(() => {
+            initMap();
+            map.invalidateSize(); // Arregla el error de que el mapa se ve gris
+        }, 200);
+    }
 }
 
 function closeModal(modalId) {
@@ -126,26 +187,67 @@ function verParcelasDe(nombreAgricultor, idAgricultor) {
 }
 
 // 3. Al hacer clic en una Parcela (Vista Final)
-function verDetalleParcela(idParcela, nombre, lat, lon) {
-    parcelaSeleccionada = idParcela;
-    
-    // Llenar datos estáticos
-    document.getElementById('det-nombre-parcela').innerText = nombre;
-    
-    // Configurar Mapa
-    const linkMap = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
-    document.getElementById('btn-maps').href = linkMap;
-
-    // SIMULAR CARGA DE DATOS (Backend)
-    // Pronto aquí harás: fetch('/api/parcela/' + id + '/full-data')
-    document.getElementById('val-temp').innerText = "22°C"; // Dato simulado
-    document.getElementById('val-hum').innerText = "45%";   // Dato simulado
-    document.getElementById('val-ph').innerText = "6.8";    // Dato simulado
-    
-    // Limpiar IA anterior
-    document.getElementById('ai-result').style.display = 'none';
-    
+async function verDetalleParcela(idParcela) {
+    // ... (Tu código de mostrar div 'detalle') ...
     mostrarNivel('detalle');
+    document.getElementById('det-nombre-parcela').innerText = "Cargando...";
+
+    try {
+        const res = await fetch(`/api/parcela/${idParcela}/full-data`);
+        
+        // Verificación: Si la respuesta no es OK, lanzamos error
+        if (!res.ok) throw new Error("Error al obtener datos del servidor");
+
+        const data = await res.json();
+        
+        // Muestra en la consola qué datos llegaron realmente (para depurar)
+        console.log("Datos recibidos:", data);
+
+        // 1. Datos Básicos
+        // Usamos ?. (optional chaining) para evitar errores si 'parcela' no existe
+        document.getElementById('det-nombre-parcela').innerText = data.parcela?.nombre || "Sin nombre";
+        
+        // 2. CLIMA REAL
+        const climaWidget = document.querySelector('.weather-widget');
+        
+        // Verificamos que el widget exista Y que hayan llegado datos de clima
+        if (climaWidget && data.clima) {
+            climaWidget.innerHTML = `
+                <img src="https://openweathermap.org/img/wn/${data.clima.icon}@2x.png" alt="Icono" style="width: 60px;">
+                <div class="weather-info">
+                    <span class="temp">${data.clima.temp}°C</span>
+                    <span class="desc">${data.clima.desc}</span>
+                    <small>Humedad: ${data.clima.humedad}% | Viento: ${data.clima.viento} m/s</small>
+                </div>
+            `;
+        } else {
+            console.error("No se encontró el widget o no hay datos de clima");
+            if(climaWidget) climaWidget.innerHTML = "<p>Datos del clima no disponibles</p>";
+        }
+
+        // 3. Link Google Maps
+        // Asegúrate que lat y lon sean números válidos
+        const lat = data.parcela?.latitud;
+        const lon = data.parcela?.longitud;
+
+        if (lat && lon) {
+            // CORRECCIÓN PRINCIPAL AQUÍ:
+            const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+
+            const btnMap = document.getElementById('btn-maps');
+            if (btnMap) {
+                btnMap.href = mapsUrl;
+                btnMap.target = "_blank"; 
+                console.log("Link generado:", mapsUrl); // Para verificar en consola
+            }
+        }
+
+        // ... (El resto de tu código de sensores e IA) ...
+
+    } catch (error) {
+        console.error("Falló la función verDetalleParcela:", error);
+        document.getElementById('det-nombre-parcela').innerText = "Error de carga";
+    }
 }
 
 // 4. Botón de IA

@@ -4,6 +4,9 @@ import mysql.connector
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import requests
+
+API_KEY_WEATHER = "942cb8c1379c7ac70368698f4554c245"
 
 load_dotenv()
 
@@ -161,6 +164,76 @@ def edit_agricultor():
     return redirect(url_for('dashboard_page'))
 
 # --- CRUD PARCELAS ---
+
+@app.route('/api/parcela/<int:parcela_id>/full-data')
+def get_parcela_full_data(parcela_id):
+    print(f"--- Solicitando datos para parcela ID: {parcela_id} ---") # DEBUG
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # 1. Obtener datos de la parcela
+    cursor.execute("SELECT * FROM parcelas WHERE parcela_id = %s", (parcela_id,))
+    parcela = cursor.fetchone()
+
+    # 2. Obtener sensor (Si falla, que no rompa todo)
+    lectura = None
+    if parcela:
+        try:
+            cursor.execute("""
+                SELECT l.* FROM lecturas_sensor l
+                JOIN sensores s ON l.sensor_id = s.sensor_id
+                WHERE s.ubicacion LIKE %s 
+                ORDER BY l.fecha_registro DESC LIMIT 1
+            """, (f"%{parcela['nombre']}%",))
+            lectura = cursor.fetchone()
+        except Exception as e:
+            print(f"Error buscando sensor: {e}")
+    
+    conn.close()
+
+    # 3. CONEXIÓN A OPENWEATHER (Depurada)
+    # Valores por defecto
+    clima_info = None 
+
+    if parcela and parcela.get('latitud') and parcela.get('longitud'):
+        lat = parcela['latitud']
+        lon = parcela['longitud']
+        
+        # IMPORTANTE: Asegúrate que esta variable esté definida arriba o impórtala
+        # API_KEY_WEATHER = "TU_API_KEY_AQUI" 
+        
+        url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY_WEATHER}&units=metric&lang=es"
+        
+        print(f"Consultando Clima URL: {url}") # DEBUG: Copia esta URL y pégala en el navegador para ver si funciona
+
+        try:
+            response = requests.get(url)
+            print(f"Status OpenWeather: {response.status_code}") # DEBUG: Debe ser 200
+
+            if response.status_code == 200:
+                data = response.json()
+                clima_info = {
+                    "temp": round(data['main']['temp'], 1),
+                    "desc": data['weather'][0]['description'].capitalize(),
+                    "icon": data['weather'][0]['icon'],
+                    "humedad": data['main']['humidity'],
+                    "viento": data['wind']['speed']
+                }
+            else:
+                print(f"Error API Clima: {response.text}") # DEBUG: Te dirá por qué falló (ej. 401 Unauthorized)
+        except Exception as e:
+            print(f"EXCEPTION conectando a OpenWeather: {e}") # DEBUG
+    else:
+        print("No se buscó clima: Faltan latitud/longitud o parcela no encontrada")
+
+    # Devolvemos todo
+    return jsonify({
+        "parcela": parcela,
+        "lectura": lectura,
+        "clima": clima_info 
+    })
+    
 
 @app.route('/add/parcela', methods=['POST'])
 def add_parcela():
