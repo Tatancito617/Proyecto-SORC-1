@@ -114,45 +114,110 @@ def dashboard_page():
 
 from flask import redirect, url_for
 
+# CRUD
+
 @app.route('/add/agricultor', methods=['POST'])
 def add_agricultor():
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        apellido = request.form['apellido']
-        email = request.form['email']
-        ubicacion = request.form['ubicacion']
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO agricultores (nombre, apellido, email, ubicacion) VALUES (%s,%s,%s,%s)", 
-                       (nombre, apellido, email, ubicacion))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('dashboard_page'))
-
-@app.route('/add/parcela', methods=['POST'])
-def add_parcela():
     nombre = request.form['nombre']
-    superficie = request.form['superficie']
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO parcelas (nombre, superficie_ha) VALUES (%s,%s)", (nombre, superficie))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('dashboard_page'))
-
-@app.route('/add/sensor', methods=['POST'])
-def add_sensor():
-    sensor_id = request.form['sensor_id']
+    apellido = request.form['apellido']
+    email = request.form['email']
     ubicacion = request.form['ubicacion']
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT IGNORE INTO sensores (sensor_id, ubicacion) VALUES (%s,%s)", (sensor_id, ubicacion))
+    cursor.execute("""
+        INSERT INTO agricultores (nombre, apellido, email, ubicacion) 
+        VALUES (%s, %s, %s, %s)
+    """, (nombre, apellido, email, ubicacion))
     conn.commit()
     conn.close()
     return redirect(url_for('dashboard_page'))
+
+@app.route('/delete/agricultor/<int:id>', methods=['POST'])
+def delete_agricultor(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM agricultores WHERE agricultor_id = %s", (id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+@app.route('/edit/agricultor', methods=['POST'])
+def edit_agricultor():
+    id = request.form['agricultor_id']
+    nombre = request.form['nombre']
+    apellido = request.form['apellido']
+    ubicacion = request.form['ubicacion']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE agricultores 
+        SET nombre=%s, apellido=%s, ubicacion=%s 
+        WHERE agricultor_id=%s
+    """, (nombre, apellido, ubicacion, id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('dashboard_page'))
+
+# --- CRUD PARCELAS ---
+
+@app.route('/add/parcela', methods=['POST'])
+def add_parcela():
+    # Ahora recibimos el ID del agricultor dueño
+    agricultor_id = request.form['agricultor_id']
+    nombre = request.form['nombre']
+    superficie = request.form['superficie']
+    lat = request.form['latitud']
+    lon = request.form['longitud']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO parcelas (nombre, superficie_ha, latitud, longitud, agricultor_id) 
+        VALUES (%s, %s, %s, %s, %s)
+    """, (nombre, superficie, lat, lon, agricultor_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('dashboard_page'))
+
+@app.route('/edit/parcela', methods=['POST'])
+def edit_parcela():
+    parcela_id = request.form['parcela_id']
+    nombre = request.form['nombre']
+    superficie = request.form['superficie']
+    latitud = request.form['latitud']
+    longitud = request.form['longitud']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE parcelas 
+        SET nombre=%s, superficie_ha=%s, latitud=%s, longitud=%s
+        WHERE parcela_id=%s
+    """, (nombre, superficie, latitud, longitud, parcela_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('dashboard_page'))
+
+@app.route('/delete/parcela/<int:id>', methods=['POST'])
+def delete_parcela(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM parcelas WHERE parcela_id = %s", (id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+# --- API PARA OBTENER PARCELAS DE UN AGRICULTOR ESPECÍFICO ---
+@app.route('/api/agricultor/<int:id>/parcelas')
+def get_parcelas_by_agricultor(id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM parcelas WHERE agricultor_id = %s", (id,))
+    parcelas = cursor.fetchall()
+    conn.close()
+    return jsonify(parcelas)
 
 # API (PARA EL ESP32)
 @app.route('/api/v1/sensor-sync', methods=['POST'])

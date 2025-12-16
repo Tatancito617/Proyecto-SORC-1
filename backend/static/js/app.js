@@ -167,3 +167,72 @@ function generarRecomendacion() {
         btn.disabled = false;
     }, 2000);
 }
+
+let agricultorActualID = null; // Variable global para saber en qué carpeta estamos
+
+// 1. ABRIR PARCELAS (Y guardar el ID del agricultor)
+async function verParcelasDe(nombre, id) {
+    agricultorActualID = id; // Guardamos el ID en memoria
+    
+    // Ponemos el ID en el formulario oculto de "Nueva Parcela" automáticamente
+    document.getElementById('input_agri_id_parcela').value = id; 
+    
+    document.getElementById('titulo-cliente').innerText = `Parcelas de ${nombre}`;
+    const contenedor = document.getElementById('contenedor-parcelas');
+    contenedor.innerHTML = '<p>Cargando...</p>';
+
+    mostrarNivel('parcelas'); // Tu función de cambiar vista
+
+    // LLAMADA REAL A LA BD
+    const response = await fetch(`/api/agricultor/${id}/parcelas`);
+    const parcelas = await response.json();
+
+    contenedor.innerHTML = ''; // Limpiar
+    
+    if(parcelas.length === 0) {
+        contenedor.innerHTML = '<p>Este agricultor no tiene parcelas aún.</p>';
+        return;
+    }
+
+    parcelas.forEach(p => {
+        // Creamos la tarjeta HTML
+        const card = document.createElement('div');
+        card.className = 'stat-card card-hover';
+        card.innerHTML = `
+            <h3>${p.nombre}</h3>
+            <p>${p.superficie_ha} ha</p>
+            <div style="margin-top:10px;">
+                <button class="btn--primary" onclick="verDetalleParcela(${p.parcela_id}, '${p.nombre}', ${p.latitud}, ${p.longitud})">Ver Datos</button>
+                <button class="btn-icon danger" onclick="borrarParcela(${p.parcela_id})">🗑️</button>
+            </div>
+        `;
+        contenedor.appendChild(card);
+    });
+}
+
+// 2. FUNCIONES DE BORRAR
+async function borrarAgricultor(id) {
+    if(!confirm("¿Seguro? Se borrarán también todas sus parcelas.")) return;
+    
+    await fetch(`/delete/agricultor/${id}`, { method: 'POST' });
+    window.location.reload(); // Recargar para ver cambios
+}
+
+async function borrarParcela(id) {
+    if(!confirm("¿Borrar parcela?")) return;
+    
+    await fetch(`/delete/parcela/${id}`, { method: 'POST' });
+    // Recargamos solo la vista de parcelas (truco rápido: recargar página)
+    window.location.reload();
+}
+
+// 3. FUNCIÓN EDITAR AGRICULTOR
+function abrirEditarAgricultor(id, nombre, apellido, ubicacion) {
+    // Rellenamos el modal con los datos actuales
+    document.getElementById('edit_agri_id').value = id;
+    document.getElementById('edit_agri_nombre').value = nombre;
+    document.getElementById('edit_agri_apellido').value = apellido;
+    document.getElementById('edit_agri_ubicacion').value = ubicacion;
+    
+    openModal('modalEditarAgricultor');
+}
