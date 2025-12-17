@@ -186,31 +186,26 @@ function verParcelasDe(nombreAgricultor, idAgricultor) {
     mostrarNivel('parcelas');
 }
 
-// 3. Al hacer clic en una Parcela (Vista Final)
 async function verDetalleParcela(idParcela) {
-    // ... (Tu código de mostrar div 'detalle') ...
+
     mostrarNivel('detalle');
     document.getElementById('det-nombre-parcela').innerText = "Cargando...";
 
     try {
         const res = await fetch(`/api/parcela/${idParcela}/full-data`);
         
-        // Verificación: Si la respuesta no es OK, lanzamos error
         if (!res.ok) throw new Error("Error al obtener datos del servidor");
 
         const data = await res.json();
         
-        // Muestra en la consola qué datos llegaron realmente (para depurar)
         console.log("Datos recibidos:", data);
 
         // 1. Datos Básicos
-        // Usamos ?. (optional chaining) para evitar errores si 'parcela' no existe
         document.getElementById('det-nombre-parcela').innerText = data.parcela?.nombre || "Sin nombre";
         
         // 2. CLIMA REAL
         const climaWidget = document.querySelector('.weather-widget');
         
-        // Verificamos que el widget exista Y que hayan llegado datos de clima
         if (climaWidget && data.clima) {
             climaWidget.innerHTML = `
                 <img src="https://openweathermap.org/img/wn/${data.clima.icon}@2x.png" alt="Icono" style="width: 60px;">
@@ -226,23 +221,39 @@ async function verDetalleParcela(idParcela) {
         }
 
         // 3. Link Google Maps
-        // Asegúrate que lat y lon sean números válidos
         const lat = data.parcela?.latitud;
         const lon = data.parcela?.longitud;
 
         if (lat && lon) {
-            // CORRECCIÓN PRINCIPAL AQUÍ:
             const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
 
             const btnMap = document.getElementById('btn-maps');
             if (btnMap) {
                 btnMap.href = mapsUrl;
                 btnMap.target = "_blank"; 
-                console.log("Link generado:", mapsUrl); // Para verificar en consola
+                console.log("Link generado:", mapsUrl);
             }
         }
 
-        // ... (El resto de tu código de sensores e IA) ...
+        if (data.lectura) {
+            // Usamos || '--' por si algún valor específico viene vacío
+            document.getElementById('val-ph').innerText = data.lectura.ph || '--';
+            document.getElementById('val-hum').innerText = data.lectura.humedad_suelo + '%';
+            document.getElementById('val-temp').innerText = data.lectura.temperatura + '°C';
+        } else {
+            // Si no hay lecturas registradas para esta parcela
+            document.getElementById('val-ph').innerText = "N/A";
+            document.getElementById('val-hum').innerText = "N/A";
+            document.getElementById('val-temp').innerText = "N/A";
+        }
+
+    // Boton para la recomendacion IA
+    const btnIA = document.querySelector('.btn-ai');
+
+    document.getElementById('ai-result').style.display = 'none'; 
+    document.getElementById('ai-result').innerHTML = '';
+
+    btnIA.onclick = function() { generarRecomendacion(idParcela); };
 
     } catch (error) {
         console.error("Falló la función verDetalleParcela:", error);
@@ -250,24 +261,39 @@ async function verDetalleParcela(idParcela) {
     }
 }
 
-// 4. Botón de IA
-function generarRecomendacion() {
+async function generarRecomendacion(idParcela) {
     const btn = document.querySelector('.btn-ai');
     const caja = document.getElementById('ai-result');
     
     btn.disabled = true;
-    btn.innerText = "Pensando... 🧠";
-    
-    // Simulación de espera de API
-    setTimeout(() => {
+    btn.innerHTML = "Analizando datos... <span class='spin'>⏳</span>";
+    caja.style.display = 'none';
+
+    try {
+        const response = await fetch(`/api/parcela/${idParcela}/recomendacion-ia`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+
+        // Mostramos el resultado
         caja.style.display = 'block';
         caja.innerHTML = `
-            <strong>💡 Recomendación:</strong><br>
-            El pH de 6.8 es óptimo para el Maíz. Sin embargo, la humedad del 45% es baja considerando el clima despejado. Se recomienda riego por goteo esta tarde.
+            <div style="font-size: 0.95rem; line-height: 1.5;">
+                <strong>💡 Diagnóstico IA:</strong><br>
+                ${data.recomendacion || data.mensaje}
+            </div>
         `;
-        btn.innerText = "✨ Generar Diagnóstico IA";
+
+    } catch (error) {
+        console.error("Error IA:", error);
+        caja.style.display = 'block';
+        caja.innerHTML = `<span style="color:red;">Error de conexión con la IA.</span>`;
+    } finally {
+        // Restaurar el botón
+        btn.innerText = "✨ Generar Nuevo Diagnóstico";
         btn.disabled = false;
-    }, 2000);
+    }
 }
 
 let agricultorActualID = null; // Variable global para saber en qué carpeta estamos
