@@ -3,283 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - SORC</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <title>SORC Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+        .card-box { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background: white; transition: transform 0.2s; }
+        .card-box:hover { transform: translateY(-5px); }
+        .bg-grad-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .bg-grad-success { background: linear-gradient(135deg, #2af598 0%, #009efd 100%); color: white; }
+        .bg-grad-warning { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: white; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        #mapaSelector { height: 300px; width: 100%; border-radius: 8px; margin-top: 10px; }
+    </style>
 </head>
-<div id="modalAgricultor" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('modalAgricultor')">&times;</span>
-        <h2>Nuevo Agricultor</h2>
-        <form action="/add/agricultor" method="POST" style="margin-top: 20px;">
-            <div class="form-group"><label>Nombre</label><input name="nombre" class="form-control" required></div>
-            <div class="form-group"><label>Apellido</label><input name="apellido" class="form-control" required></div>
-            <div class="form-group"><label>Email</label><input type="email" name="email" class="form-control" required></div>
-            <div class="form-group"><label>Ubicación</label><input name="ubicacion" class="form-control" required></div>
-            <button type="submit" class="iniciar-button" style="width:100%; padding:10px; font-size:1rem;">Guardar</button>
-        </form>
-    </div>
-</div>
-
-<div id="modalParcela" class="modal">
-    <div class="modal-content" style="max-width: 700px;"> <span class="close-btn" onclick="closeModal('modalParcela')">&times;</span>
-        <h2>Nueva Parcela 📍</h2>
-        
-        <form action="/add/parcela" method="POST" id="formParcela">
-            <input type="hidden" name="agricultor_id" id="input_agri_id_parcela">
-            
-            <div style="display: flex; gap: 10px;">
-                <div style="flex: 1;">
-                    <label>Nombre Parcela</label>
-                    <input name="nombre" class="form-control" required placeholder="Ej: Parcela Los Ríos">
-                </div>
-                <div style="flex: 1;">
-                    <label>Superficie (ha)</label>
-                    <input type="number" step="0.1" name="superficie" class="form-control" required>
-                </div>
-            </div>
-
-            <div style="margin-top: 15px; border: 1px solid #ccc; padding: 10px; border-radius: 8px;">
-                <label>📍 Ubicación (Busca tu ciudad y haz clic en el mapa)</label>
-                
-                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-                    <input type="text" id="buscadorMapa" class="form-control" placeholder="Ej: Osorno, Chile">
-                    <button type="button" class="btn--primary" onclick="buscarEnMapa()">🔍 Buscar</button>
-                </div>
-
-                <div id="mapaSelector" style="height: 300px; width: 100%; border-radius: 4px;"></div>
-                <small style="color: #666;">Haz clic en el lugar exacto de la parcela para guardar las coordenadas.</small>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <input name="latitud" id="input_lat" class="form-control" readonly placeholder="Latitud" required>
-                <input name="longitud" id="input_lon" class="form-control" readonly placeholder="Longitud" required>
-            </div>
-            
-            <button type="submit" class="iniciar-button" style="margin-top: 15px;">Guardar Parcela</button>
-        </form>
-    </div>
-</div>
-
-<div id="modalSensor" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('modalSensor')">&times;</span>
-        <h2>Nuevo Sensor</h2>
-        <form action="/add/sensor" method="POST" style="margin-top: 20px;">
-            <div class="form-group"><label>ID Sensor (Chip ID)</label><input name="sensor_id" class="form-control" placeholder="Ej: ESP32_005" required></div>
-            <div class="form-group"><label>Ubicación</label><input name="ubicacion" class="form-control" placeholder="Ej: Sector Norte" required></div>
-            <button type="submit" class="iniciar-button" style="width:100%; padding:10px; font-size:1rem;">Guardar</button>
-        </form>
-    </div>
-</div>
-
 <body>
-    <div class="main-app">
-        <aside class="sidebar">
-            <div class="sidebar-logo">🌱 SORC</div>
-            <nav>
-                <button class="nav-item active" data-view="dashboard">
-                    <span style="font-size: 1.2rem;">🏠</span> 
-                    <span>Inicio</span>
-                </button>
-                
-                <button class="nav-item" data-view="agricultores">
-                    <span style="font-size: 1.2rem;">👨‍🌾</span>
-                    <span>Agri</span>
-                </button>
-                
-                <button class="nav-item" data-view="parcelas">
-                    <span style="font-size: 1.2rem;">🌾</span>
-                    <span>Parcelas</span>
-                </button>
-                
-                <button class="nav-item" data-view="sensores">
-                    <span style="font-size: 1.2rem;">📡</span>
-                    <span>Sensores</span>
-                </button>
-                
-                <button class="nav-item" data-view="lecturas">
-                    <span style="font-size: 1.2rem;">📊</span>
-                    <span>Lecturas</span>
-                </button>
 
-            </nav>
-        </aside>
-        
-        <main class="main-content">
-            <header class="header">
-                <div>Bienvenido, Administrador</div>
-                <div id="currentDateTime"></div>
-            </header>
-            
-            <div id="dashboard" class="view active">
-                <h2>Resumen General</h2>
-                <div class="dashboard-grid" style="margin-top: 20px;">
-                    <div class="stat-card">
-                        <div class="stat-value">{{ n_agricultores }}</div>
-                        <div class="stat-label">Agricultores</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">{{ n_parcelas }}</div>
-                        <div class="stat-label">Parcelas</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">{{ n_sensores }}</div>
-                        <div class="stat-label">Sensores Activos</div>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/dashboard"><i class="fas fa-leaf text-success"></i> SORC</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/agricultores"><i class="fas fa-users"></i> Agricultores</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/parcelas"><i class="fas fa-layer-group"></i> Parcelas</a></li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <div class="dropdown">
+                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle fa-2x me-2"></i>
+                            <span class="d-none d-md-inline" id="navNombreUsuario">Usuario</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownUser1">
+                            <li><a class="dropdown-item" href="#" onclick="verPerfil()"><i class="fas fa-id-card me-2 text-primary"></i> Ver Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="cerrarSesion()"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
+                        </ul>
                     </div>
                 </div>
             </div>
-<div id="agricultores" class="view">
-                
-                <div id="panel-lista-agricultores">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2>👨‍🌾 Mis Clientes</h2>
-                        <button class="btn--primary" onclick="openModal('modalAgricultor')">+ Nuevo Cliente</button>
-                    </div>
-                    
-                    <div class="list-group">
-                        {% for agri in agricultores %}
-                        <div class="card card-hover" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div style="flex-grow: 1; cursor: pointer;" onclick="verParcelasDe('{{ agri.nombre }}', {{ agri.agricultor_id }})">
-                                <h3>{{ agri.nombre }} {{ agri.apellido }}</h3>
-                                <p style="color: #666; font-size: 0.9rem;">📍 {{ agri.ubicacion }}</p>
-                            </div>
-                            
-                            <div style="display: flex; gap: 10px;">
-                                <button class="btn-icon warning" onclick="abrirEditarAgricultor({{ agri.agricultor_id }}, '{{ agri.nombre }}', '{{ agri.apellido }}', '{{ agri.ubicacion }}')">✏️</button>
-                                <button class="btn-icon danger" onclick="borrarAgricultor({{ agri.agricultor_id }})">🗑️</button>
-                            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+
+        <div id="panel-resumen">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="fw-bold text-secondary">Dashboard General</h3>
+                <button class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#modalAgricultor">
+                    <i class="fas fa-plus"></i> Nuevo Agricultor
+                </button>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card card-box bg-grad-primary p-3">
+                        <div class="d-flex justify-content-between">
+                            <div><h5 class="mb-0">Agricultores</h5><h2 class="fw-bold mb-0">{{ n_agricultores }}</h2></div>
+                            <i class="fas fa-user-friends fa-3x opacity-50"></i>
                         </div>
-                        {% else %}
-                        <p>No hay agricultores registrados.</p>
-                        {% endfor %}
                     </div>
                 </div>
-
-                <div id="panel-lista-parcelas" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <button class="btn-back" onclick="mostrarNivel('agricultores')">⬅ Volver</button>
-                        <button class="btn--primary" onclick="openModal('modalParcela')">+ Nueva Parcela</button>
+                <div class="col-md-4">
+                    <div class="card card-box bg-grad-success p-3">
+                        <div class="d-flex justify-content-between">
+                            <div><h5 class="mb-0">Parcelas</h5><h2 class="fw-bold mb-0">{{ n_parcelas }}</h2></div>
+                            <i class="fas fa-map-marked-alt fa-3x opacity-50"></i>
+                        </div>
                     </div>
-                    
-                    <h2 id="titulo-cliente" style="margin-top: 10px;">Parcelas de...</h2>
-                    
-                    <div id="contenedor-parcelas" class="dashboard-grid"></div>
                 </div>
-
-                <div id="panel-detalle-parcela" style="display: none;">
-                    <button class="btn-back" onclick="mostrarNivel('parcelas')">⬅ Volver a Parcelas</button>
-                    
-                    <div class="card" style="margin-top: 15px; border-top: 5px solid var(--primary-green);">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <h2 id="det-nombre-parcela">Parcela</h2>
-                            <a id="btn-maps" href="#" target="_blank" class="btn--primary" style="background: #4285F4;">🗺️ Ir con Maps</a>
-                        </div>
-
-                        <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <div class="weather-widget" style="flex:1; background:#3c3c3c; padding:10px; border-radius:8px; min-height: 120px;">
-                                <h4>☁️ Clima</h4>
-                                <p>Cargando datos...</p>
-                            </div>
-                            <div style="flex:1; background:#fff3e0; padding:10px; border-radius:8px;">
-                                <h4>🌱 Suelo (Sensor)</h4>
-                                <p>pH: <strong id="val-ph">--</strong></p>
-                                <p>Humedad: <strong id="val-hum">--%</strong></p>
-                                <p>Temp: <strong id="val-temp">--°C</strong></p>
-                            </div>
-                        </div>
-
-                        <div class="ai-section" style="margin-top: 20px;">
-                            <h3>🤖 Recomendación IA</h3>
-                            <div id="ai-result" class="ai-box" style="display:none; padding: 10px; background: #f9f9f9; border-left: 4px solid gold; margin: 10px 0;"></div>
-                            <button class="btn-ai btn--primary" style="width: 100%;" onclick="generarRecomendacion()">✨ Generar Diagnóstico</button>
+                <div class="col-md-4">
+                    <div class="card card-box bg-grad-warning p-3">
+                        <div class="d-flex justify-content-between">
+                            <div><h5 class="mb-0">Sensores</h5><h2 class="fw-bold mb-0">{{ n_sensores }}</h2></div>
+                            <i class="fas fa-wifi fa-3x opacity-50"></i>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div id="lecturas" class="view">
-                <h2>Últimas Lecturas de Sensores</h2>
-                <div class="card" style="margin-top: 20px;">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Sensor</th>
-                                <th>Ubicación</th>
-                                <th>Temp</th>
-                                <th>Humedad</th>
-                                <th>pH</th>
-                                <th>Fecha</th>
-                            </tr>
-                        </thead>
+            <div class="row mb-4">
+                <div class="col-lg-5 mb-4 mb-lg-0">
+                    <div class="card card-box h-100">
+                        <div class="card-header bg-white fw-bold border-0"><i class="fas fa-chart-pie text-primary me-2"></i> Distribución de Superficie (ha)</div>
+                        <div class="card-body"><div class="chart-container"><canvas id="graficoParcelas"></canvas></div></div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card card-box h-100">
+                        <div class="card-header bg-white fw-bold border-0"><i class="fas fa-temperature-high text-danger me-2"></i> Historial Ambiental</div>
+                        <div class="card-body"><div class="chart-container"><canvas id="graficoLecturas"></canvas></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-box">
+                <div class="card-header bg-white fw-bold py-3"><i class="fas fa-table text-primary me-2"></i> Últimas Lecturas</div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light"><tr><th>Fecha</th><th>Parcela</th><th>Temp.</th><th>Humedad</th><th>pH</th></tr></thead>
                         <tbody>
-                            {% for dato in tabla_lecturas %}
+                            {% for lect in tabla_lecturas %}
                             <tr>
-                                <td>{{ dato.sensor_id }}</td>
-                                <td>{{ dato.ubicacion }}</td>
-                                <td>{{ dato.temperatura }}°C</td>
-                                <td>{{ dato.humedad_suelo }}%</td>
-                                <td>{{ dato.ph }}</td>
-                                <td>{{ dato.fecha_registro }}</td>
+                                <td>{{ lect.fecha_registro }}</td>
+                                <td>Parcela #{{ lect.parcela_id }}</td>
+                                <td><span class="badge bg-danger">{{ lect.temperatura }}°C</span></td>
+                                <td><span class="badge bg-primary">{{ lect.humedad_suelo }}%</span></td>
+                                <td>{{ lect.ph }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="6">No hay datos recientes.</td></tr>
+                            <tr><td colspan="5" class="text-center">Sin datos</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
+        </div>
 
-        </main>
-    </div>
+        <div id="panel-lista-agricultores" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3><i class="fas fa-users text-primary"></i> Agricultores</h3>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAgricultor">Nuevo</button>
+            </div>
+            <div class="row">
+                {% for agri in agricultores %}
+                <div class="col-md-4 mb-4">
+                    <div class="card card-box h-100 p-3">
+                        <h5 class="fw-bold">{{ agri.nombre }} {{ agri.apellido }}</h5>
+                        <p class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ agri.ubicacion }}</p>
+                        <div class="mt-auto">
+                            <button class="btn btn-outline-primary w-100" onclick="verParcelasDe('{{ agri.nombre }}', {{ agri.agricultor_id }})">Ver Parcelas</button>
+                            <div class="mt-2 d-flex gap-2">
+                                <button class="btn btn-sm btn-light flex-grow-1" onclick="abrirEditarAgricultor({{agri.agricultor_id}}, '{{agri.nombre}}', '{{agri.apellido}}', '{{agri.ubicacion}}')">Editar</button>
+                                <button class="btn btn-sm btn-light text-danger" onclick="borrarAgricultor({{ agri.agricultor_id }})">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
 
-    <div id="modalAgricultor" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('modalAgricultor')">&times;</span>
-            <h2>Nuevo Agricultor</h2>
-            <form action="/add/agricultor" method="POST" style="margin-top: 15px;">
-                <div class="form-group"><label>Nombre</label><input name="nombre" class="form-control" required></div>
-                <div class="form-group"><label>Apellido</label><input name="apellido" class="form-control" required></div>
-                <div class="form-group"><label>Email</label><input name="email" type="email" class="form-control" required></div>
-                <div class="form-group"><label>Ubicación</label><input name="ubicacion" class="form-control" required></div>
-                <button type="submit" class="iniciar-button" style="width: 100%; margin-top: 10px;">Guardar</button>
-            </form>
+        <div id="panel-lista-parcelas" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div><button class="btn btn-sm btn-outline-secondary mb-2" onclick="mostrarSeccion('agricultores')">Volver</button><h3 id="titulo-cliente">Parcelas</h3></div>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalParcela">Nueva Parcela</button>
+            </div>
+            <div id="contenedor-parcelas" class="row"></div>
+        </div>
+
+        <div id="panel-detalle-parcela" style="display:none;">
+            <div class="d-flex align-items-center mb-3">
+                <button class="btn btn-outline-secondary me-3" onclick="mostrarSeccion('parcelas')"><i class="fas fa-arrow-left"></i></button>
+                <h2 class="fw-bold" id="det-nombre-parcela">Detalle</h2>
+            </div>
+            <div class="weather-widget mb-4"></div>
+            <div class="row text-center mb-4">
+                <div class="col-4"><div class="card p-3 border-primary border-bottom border-4"><h5>pH</h5><h3 class="text-primary" id="val-ph">--</h3></div></div>
+                <div class="col-4"><div class="card p-3 border-info border-bottom border-4"><h5>Humedad</h5><h3 class="text-info" id="val-hum">--%</h3></div></div>
+                <div class="col-4"><div class="card p-3 border-danger border-bottom border-4"><h5>Temp</h5><h3 class="text-danger" id="val-temp">--°C</h3></div></div>
+            </div>
+            <div class="card card-box border-0 shadow-lg p-3">
+                <h5><i class="fas fa-brain text-warning"></i> IA Agrónomo</h5>
+                <button class="btn btn-warning w-100 mt-2 btn-ai" onclick="">Generar Diagnóstico</button>
+                <div id="ai-result" class="mt-3" style="display:none;"></div>
+            </div>
         </div>
     </div>
 
-    <div id="modalEditarAgricultor" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('modalEditarAgricultor')">&times;</span>
-            <h2>Editar Agricultor</h2>
-            <form action="/edit/agricultor" method="POST" style="margin-top: 15px;">
-                <input type="hidden" name="agricultor_id" id="edit_agri_id">
-                <div class="form-group"><label>Nombre</label><input name="nombre" id="edit_agri_nombre" class="form-control"></div>
-                <div class="form-group"><label>Apellido</label><input name="apellido" id="edit_agri_apellido" class="form-control"></div>
-                <div class="form-group"><label>Ubicación</label><input name="ubicacion" id="edit_agri_ubicacion" class="form-control"></div>
-                <button type="submit" class="iniciar-button" style="width: 100%; margin-top: 10px;">Guardar Cambios</button>
-            </form>
+    <div class="modal fade" id="modalPerfil" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-user-circle"></i> Mi Perfil</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <div class="mb-3"><div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 100px; height: 100px;"><i class="fas fa-user text-secondary fa-4x"></i></div></div>
+                    <h3 class="fw-bold" id="perfilNombre">Cargando...</h3>
+                    <p class="text-muted mb-4" id="perfilRol">Usuario</p>
+                    <div class="card text-start bg-light border-0"><div class="card-body"><p class="mb-2"><strong>RUT:</strong> <span id="perfilRut">--</span></p><p class="mb-0"><strong>Email:</strong> <span id="perfilEmail">--</span></p></div></div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-danger" onclick="cerrarSesion()">Cerrar Sesión</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="modalEditarParcela" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('modalEditarParcela')">&times;</span>
-            <h2>Editar Parcela</h2>
-            <form action="/edit/parcela" method="POST" style="margin-top: 15px;">
-                <input type="hidden" name="parcela_id" id="edit_parcela_id">
-                
-                <div class="form-group"><label>Nombre</label><input name="nombre" id="edit_parcela_nombre" class="form-control" required></div>
-                <div class="form-group"><label>Superficie (ha)</label><input type="number" step="0.1" name="superficie" id="edit_parcela_superficie" class="form-control"></div>
-                <div class="form-group"><label>Latitud</label><input name="latitud" id="edit_parcela_lat" type="number" step="any" class="form-control"></div>
-                <div class="form-group"><label>Longitud</label><input name="longitud" id="edit_parcela_lon" type="number" step="any" class="form-control"></div>
-                
-                <button type="submit" class="iniciar-button" style="width: 100%; margin-top: 10px;">Guardar Cambios</button>
-            </form>
-        </div>
-    </div>
+    <div class="modal fade" id="modalAgricultor" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/add/agricultor" method="POST"><div class="modal-header bg-primary text-white"><h5 class="modal-title">Nuevo Agricultor</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="text" name="nombre" class="form-control mb-2" placeholder="Nombre" required><input type="text" name="apellido" class="form-control mb-2" placeholder="Apellido" required><input type="email" name="email" class="form-control mb-2" placeholder="Email"><input type="text" name="ubicacion" class="form-control" placeholder="Ubicación"></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div>
+    
+    <div class="modal fade" id="modalEditarAgricultor" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/edit/agricultor" method="POST"><div class="modal-header bg-warning"><h5 class="modal-title">Editar Agricultor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="agricultor_id" id="edit_agri_id"><input type="text" name="nombre" id="edit_agri_nombre" class="form-control mb-2" required><input type="text" name="apellido" id="edit_agri_apellido" class="form-control mb-2" required><input type="text" name="ubicacion" id="edit_agri_ubicacion" class="form-control"></div><div class="modal-footer"><button type="submit" class="btn btn-warning">Actualizar</button></div></form></div></div></div>
+
+    <div class="modal fade" id="modalParcela" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form action="/add/parcela" method="POST"><div class="modal-header bg-success text-white"><h5 class="modal-title">Nueva Parcela</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="agricultor_id" id="input_agri_id_parcela"><div class="row"><div class="col-md-6"><input type="text" name="nombre" class="form-control mb-2" placeholder="Nombre Parcela" required><input type="number" step="0.1" name="superficie" class="form-control mb-2" placeholder="Hectáreas" required><div class="input-group mb-2"><input type="text" id="buscadorMapa" class="form-control" placeholder="Buscar ciudad..."><button type="button" class="btn btn-secondary" onclick="buscarEnMapa()">Ir</button></div><input type="text" name="latitud" id="input_lat" class="form-control mb-1" placeholder="Lat" readonly><input type="text" name="longitud" id="input_lon" class="form-control" placeholder="Lon" readonly></div><div class="col-md-6"><div id="mapaSelector"></div></div></div></div><div class="modal-footer"><button type="submit" class="btn btn-success">Guardar</button></div></form></div></div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        window.datosGlobales = {
+            lecturas: {{ grafico_lecturas | default([]) | tojson }},
+            parcelas: {{ grafico_parcelas | default([]) | tojson }}
+        };
+    </script>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-
+    
+    <script>
+        document.getElementById('modalParcela').addEventListener('shown.bs.modal', function () {
+            if(typeof initMap === 'function') { initMap(); setTimeout(() => { if(map) map.invalidateSize(); }, 200); }
+        });
+    </script>
 </body>
 </html>

@@ -1,14 +1,7 @@
-function checkRut(rut) {
-    var valor = rut.value.replace('.','').replace('.','');
-    valor = valor.replace('-','');
-    var cuerpo = valor.slice(0,-1);
-    var dv = valor.slice(-1).toUpperCase();
-    rut.value = cuerpo + '-'+ dv;
-    if(cuerpo.length < 7) { rut.value = valor; return; }
-    rut.value = rut.value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-}
+// ==========================================
+// 1. GESTIÓN DE SESIÓN Y NAVEGACIÓN
+// ==========================================
 
-// VALIDAR LOGIN
 async function handleLogin(event) {
     event.preventDefault();
     const rut = document.getElementById('rutInput').value;
@@ -16,7 +9,6 @@ async function handleLogin(event) {
     const errorMsg = document.getElementById('loginError');
 
     try {
-        // Petición al Backend
         const response = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -26,341 +18,235 @@ async function handleLogin(event) {
         const data = await response.json();
 
         if (response.ok) {
-            // Login Exitoso
-            console.log("Bienvenido " + data.nombre);
+            // Guardar sesión en navegador
+            localStorage.setItem('usuarioActivo', JSON.stringify(data.usuario));
             window.location.href = "/dashboard"; 
         } else {
-            // Error (Contraseña incorrecta o usuario no existe)
             errorMsg.style.display = 'block';
             errorMsg.innerText = data.mensaje;
-            // Animación de error
-            document.querySelector('.login-card').animate([
-                { transform: 'translateX(0)' }, { transform: 'translateX(-5px)' }, 
-                { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }
-            ], { duration: 300 });
         }
     } catch (error) {
-        console.error("Error de conexión:", error);
+        console.error("Error:", error);
         errorMsg.style.display = 'block';
-        errorMsg.innerText = "Error de conexión con el servidor";
+        errorMsg.innerText = "Error de conexión";
     }
 }
 
-// RELOJ Y NAVEGACIÓN
+function cerrarSesion() {
+    localStorage.removeItem('usuarioActivo');
+    window.location.href = "/login";
+}
+
+function verPerfil() {
+    const data = localStorage.getItem('usuarioActivo');
+    if (data) {
+        const u = JSON.parse(data);
+        document.getElementById('perfilNombre').innerText = u.nombre;
+        document.getElementById('perfilRut').innerText = u.rut;
+        document.getElementById('perfilEmail').innerText = u.email;
+        document.getElementById('perfilRol').innerText = u.rol;
+        const modal = new bootstrap.Modal(document.getElementById('modalPerfil'));
+        modal.show();
+    } else {
+        window.location.href = "/login";
+    }
+}
+
+// INICIALIZACIÓN
 document.addEventListener('DOMContentLoaded', () => {
     // Reloj
-    const timeDisplay = document.getElementById('currentDateTime');
-    if(timeDisplay) {
-        setInterval(() => {
-            timeDisplay.innerText = new Date().toLocaleString();
-        }, 1000);
+    const t = document.getElementById('currentDateTime');
+    if(t) setInterval(() => { t.innerText = new Date().toLocaleString(); }, 1000);
+
+    // Cargar Nombre Usuario
+    const data = localStorage.getItem('usuarioActivo');
+    if(data) {
+        const u = JSON.parse(data);
+        const lbl = document.getElementById('navNombreUsuario');
+        if(lbl) lbl.innerText = u.nombre.split(' ')[0];
+    } else {
+        // Si no hay login y estamos en dashboard, podrías forzar redirect:
+        // if(window.location.pathname.includes('/dashboard')) window.location.href = "/login";
     }
 
-    // Tabs del Sidebar
-    document.querySelectorAll('.nav-item').forEach(button => {
-        button.addEventListener('click', () => {
-            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            
-            button.classList.add('active');
-            const viewId = button.getAttribute('data-view');
-            const view = document.getElementById(viewId);
-            if(view) view.classList.add('active');
-        });
-    });
+    // Navegación URL
+    const path = window.location.pathname;
+    if (path.includes('/agricultores')) mostrarSeccion('agricultores');
+    else if (path.includes('/parcelas')) mostrarSeccion('parcelas');
+    else mostrarSeccion('resumen');
+
+    initCharts();
 });
 
+function mostrarSeccion(nombre) {
+    const p = ['panel-resumen', 'panel-lista-agricultores', 'panel-lista-parcelas', 'panel-detalle-parcela'];
+    p.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+
+    let id = 'panel-resumen';
+    if(nombre === 'agricultores') id = 'panel-lista-agricultores';
+    if(nombre === 'parcelas') id = 'panel-lista-parcelas';
+    if(nombre === 'detalle') id = 'panel-detalle-parcela';
+    
+    const div = document.getElementById(id);
+    if(div) div.style.display = 'block';
+}
+
+// ==========================================
+// 2. GRÁFICOS
+// ==========================================
+function initCharts() {
+    if (!window.datosGlobales) return;
+
+    // Tarta
+    const ctxPie = document.getElementById('graficoParcelas');
+    if (ctxPie && window.datosGlobales.parcelas.length > 0) {
+        const d = window.datosGlobales.parcelas;
+        new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+                labels: d.map(p => p.nombre),
+                datasets: [{
+                    data: d.map(p => p.superficie_ha),
+                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6f42c1'],
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // Línea
+    const ctxLine = document.getElementById('graficoLecturas');
+    if (ctxLine && window.datosGlobales.lecturas.length > 0) {
+        const d = [...window.datosGlobales.lecturas].reverse();
+        new Chart(ctxLine, {
+            type: 'line',
+            data: {
+                labels: d.map(l => new Date(l.fecha_registro).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})),
+                datasets: [
+                    { label: 'Temp', data: d.map(l => l.temperatura), borderColor: '#dc3545', fill: true, tension: 0.4 },
+                    { label: 'Humedad', data: d.map(l => l.humedad_suelo), borderColor: '#0d6efd', fill: true, tension: 0.4 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
+        });
+    }
+}
+
+// ==========================================
+// 3. MAPAS Y NEGOCIO
+// ==========================================
 let map, marker;
-
-// 1. INICIALIZAR MAPA (Llamar a esta función cuando se abra el modal)
 function initMap() {
-    // Si el mapa ya existe, no lo creamos de nuevo
-    if (map) return; 
-
-    // Coordenadas iniciales (Osorno)
+    if (map) return;
     map = L.map('mapaSelector').setView([-40.5725, -73.1353], 12);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Evento: Al hacer clic en el mapa
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     map.on('click', function(e) {
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-
-        // Mover el marcador
-        if (marker) {
-            marker.setLatLng(e.latlng);
-        } else {
-            marker = L.marker(e.latlng).addTo(map);
-        }
-
-        // Llenar los inputs del formulario
-        document.getElementById('input_lat').value = lat.toFixed(6);
-        document.getElementById('input_lon').value = lng.toFixed(6);
+        if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('input_lat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('input_lon').value = e.latlng.lng.toFixed(6);
     });
 }
-
-// 2. BUSCADOR DE CIUDAD (Nominatim API - Gratis)
 async function buscarEnMapa() {
-    const query = document.getElementById('buscadorMapa').value;
-    if(!query) return;
-
-    try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
-        const data = await response.json();
-
-        if (data && data.length > 0) {
-            const lat = data[0].lat;
-            const lon = data[0].lon;
-            map.setView([lat, lon], 14); // Mover mapa al lugar encontrado
-        } else {
-            alert("Lugar no encontrado 😅");
-        }
-    } catch (error) {
-        console.error("Error buscando lugar:", error);
-    }
+    const q = document.getElementById('buscadorMapa').value;
+    if(!q) return;
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`);
+    const d = await r.json();
+    if(d.length > 0) map.setView([d[0].lat, d[0].lon], 14);
 }
 
-function openModal(modalId) {
-    document.getElementById(modalId).classList.add('show');
-    
-    if(modalId === 'modalParcela') {
-        // Truco: Esperar un poco a que el modal sea visible para cargar el mapa
-        setTimeout(() => {
-            initMap();
-            map.invalidateSize(); // Arregla el error de que el mapa se ve gris
-        }, 200);
-    }
-}
+// Agricultores y Parcelas
+let agricultorActualID = null;
 
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('show');
-}
-
-// Cerrar si hacen clic fuera de la ventanita
-window.onclick = function(event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.classList.remove('show');
-    }
-}
-
-// --- LÓGICA DE NAVEGACIÓN JERÁRQUICA ---
-
-let parcelaSeleccionada = null; // Guardará el ID para usarlo en la IA
-
-// 1. Función para cambiar entre niveles (Ocultar/Mostrar divs)
-function mostrarNivel(nivel) {
-    // Ocultar todo
-    document.getElementById('panel-lista-agricultores').style.display = 'none';
-    document.getElementById('panel-lista-parcelas').style.display = 'none';
-    document.getElementById('panel-detalle-parcela').style.display = 'none';
-
-    // Mostrar el deseado
-    if (nivel === 'agricultores') document.getElementById('panel-lista-agricultores').style.display = 'block';
-    if (nivel === 'parcelas') document.getElementById('panel-lista-parcelas').style.display = 'block';
-    if (nivel === 'detalle') document.getElementById('panel-detalle-parcela').style.display = 'block';
-}
-
-// 2. Al hacer clic en un Agricultor
-function verParcelasDe(nombreAgricultor, idAgricultor) {
-    document.getElementById('titulo-cliente').innerText = `Parcelas de ${nombreAgricultor}`;
-    const contenedor = document.getElementById('contenedor-parcelas');
-    
-    // AQUÍ PRONTO HAREMOS: fetch('/api/agricultor/' + id + '/parcelas')
-    // POR AHORA: Simulamos tarjetas para ver el diseño
-    contenedor.innerHTML = `
-        <div class="stat-card card-hover" onclick="verDetalleParcela(101, 'Parcela Los Pinos', -40.57, -73.13)">
-            <h3 style="color: var(--primary-green);">Parcela Los Pinos</h3>
-            <p>🌽 Maíz • 15 ha</p>
-            <button class="btn--primary" style="margin-top:10px; width:100%">Diagnosticar 🩺</button>
-        </div>
-        <div class="stat-card card-hover" onclick="verDetalleParcela(102, 'Parcela El Bajo', -40.60, -73.10)">
-            <h3 style="color: #e67e22;">Parcela El Bajo</h3>
-            <p>🌾 Trigo • 8 ha</p>
-            <button class="btn--primary" style="margin-top:10px; width:100%">Diagnosticar 🩺</button>
-        </div>
-    `;
-    
-    mostrarNivel('parcelas');
-}
-
-async function verDetalleParcela(idParcela) {
-
-    mostrarNivel('detalle');
-    document.getElementById('det-nombre-parcela').innerText = "Cargando...";
-
-    try {
-        const res = await fetch(`/api/parcela/${idParcela}/full-data`);
-        
-        if (!res.ok) throw new Error("Error al obtener datos del servidor");
-
-        const data = await res.json();
-        
-        console.log("Datos recibidos:", data);
-
-        // 1. Datos Básicos
-        document.getElementById('det-nombre-parcela').innerText = data.parcela?.nombre || "Sin nombre";
-        
-        // 2. CLIMA REAL
-        const climaWidget = document.querySelector('.weather-widget');
-        
-        if (climaWidget && data.clima) {
-            climaWidget.innerHTML = `
-                <img src="https://openweathermap.org/img/wn/${data.clima.icon}@2x.png" alt="Icono" style="width: 60px;">
-                <div class="weather-info">
-                    <span class="temp">${data.clima.temp}°C</span>
-                    <span class="desc">${data.clima.desc}</span>
-                    <small>Humedad: ${data.clima.humedad}% | Viento: ${data.clima.viento} m/s</small>
-                </div>
-            `;
-        } else {
-            console.error("No se encontró el widget o no hay datos de clima");
-            if(climaWidget) climaWidget.innerHTML = "<p>Datos del clima no disponibles</p>";
-        }
-
-        // 3. Link Google Maps
-        const lat = data.parcela?.latitud;
-        const lon = data.parcela?.longitud;
-
-        if (lat && lon) {
-            const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
-
-            const btnMap = document.getElementById('btn-maps');
-            if (btnMap) {
-                btnMap.href = mapsUrl;
-                btnMap.target = "_blank"; 
-                console.log("Link generado:", mapsUrl);
-            }
-        }
-
-        if (data.lectura) {
-            // Usamos || '--' por si algún valor específico viene vacío
-            document.getElementById('val-ph').innerText = data.lectura.ph || '--';
-            document.getElementById('val-hum').innerText = data.lectura.humedad_suelo + '%';
-            document.getElementById('val-temp').innerText = data.lectura.temperatura + '°C';
-        } else {
-            // Si no hay lecturas registradas para esta parcela
-            document.getElementById('val-ph').innerText = "N/A";
-            document.getElementById('val-hum').innerText = "N/A";
-            document.getElementById('val-temp').innerText = "N/A";
-        }
-
-    // Boton para la recomendacion IA
-    const btnIA = document.querySelector('.btn-ai');
-
-    document.getElementById('ai-result').style.display = 'none'; 
-    document.getElementById('ai-result').innerHTML = '';
-
-    btnIA.onclick = function() { generarRecomendacion(idParcela); };
-
-    } catch (error) {
-        console.error("Falló la función verDetalleParcela:", error);
-        document.getElementById('det-nombre-parcela').innerText = "Error de carga";
-    }
-}
-
-async function generarRecomendacion(idParcela) {
-    const btn = document.querySelector('.btn-ai');
-    const caja = document.getElementById('ai-result');
-    
-    btn.disabled = true;
-    btn.innerHTML = "Analizando datos... <span class='spin'>⏳</span>";
-    caja.style.display = 'none';
-
-    try {
-        const response = await fetch(`/api/parcela/${idParcela}/recomendacion-ia`, {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-
-        // Mostramos el resultado
-        caja.style.display = 'block';
-        caja.innerHTML = `
-            <div style="font-size: 0.95rem; line-height: 1.5;">
-                <strong>💡 Diagnóstico IA:</strong><br>
-                ${data.recomendacion || data.mensaje}
-            </div>
-        `;
-
-    } catch (error) {
-        console.error("Error IA:", error);
-        caja.style.display = 'block';
-        caja.innerHTML = `<span style="color:red;">Error de conexión con la IA.</span>`;
-    } finally {
-        // Restaurar el botón
-        btn.innerText = "✨ Generar Nuevo Diagnóstico";
-        btn.disabled = false;
-    }
-}
-
-let agricultorActualID = null; // Variable global para saber en qué carpeta estamos
-
-// 1. ABRIR PARCELAS (Y guardar el ID del agricultor)
 async function verParcelasDe(nombre, id) {
-    agricultorActualID = id; // Guardamos el ID en memoria
-    
-    // Ponemos el ID en el formulario oculto de "Nueva Parcela" automáticamente
-    document.getElementById('input_agri_id_parcela').value = id; 
+    agricultorActualID = id;
+    const inp = document.getElementById('input_agri_id_parcela');
+    if(inp) inp.value = id;
     
     document.getElementById('titulo-cliente').innerText = `Parcelas de ${nombre}`;
-    const contenedor = document.getElementById('contenedor-parcelas');
-    contenedor.innerHTML = '<p>Cargando...</p>';
-
-    mostrarNivel('parcelas'); // Tu función de cambiar vista
-
-    // LLAMADA REAL A LA BD
-    const response = await fetch(`/api/agricultor/${id}/parcelas`);
-    const parcelas = await response.json();
-
-    contenedor.innerHTML = ''; // Limpiar
+    const cont = document.getElementById('contenedor-parcelas');
+    cont.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
     
-    if(parcelas.length === 0) {
-        contenedor.innerHTML = '<p>Este agricultor no tiene parcelas aún.</p>';
-        return;
-    }
+    mostrarSeccion('parcelas');
 
-    parcelas.forEach(p => {
-        // Creamos la tarjeta HTML
-        const card = document.createElement('div');
-        card.className = 'stat-card card-hover';
-        card.innerHTML = `
-            <h3>${p.nombre}</h3>
-            <p>${p.superficie_ha} ha</p>
-            <div style="margin-top:10px;">
-                <button class="btn--primary" onclick="verDetalleParcela(${p.parcela_id}, '${p.nombre}', ${p.latitud}, ${p.longitud})">Ver Datos</button>
-                <button class="btn-icon danger" onclick="borrarParcela(${p.parcela_id})">🗑️</button>
-            </div>
-        `;
-        contenedor.appendChild(card);
-    });
+    try {
+        const res = await fetch(`/api/agricultor/${id}/parcelas`);
+        const data = await res.json();
+        cont.innerHTML = '';
+
+        if(data.length === 0) { cont.innerHTML = '<div class="alert alert-warning">Sin parcelas.</div>'; return; }
+
+        data.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'col-md-4 mb-4';
+            div.innerHTML = `
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body text-center">
+                        <i class="fas fa-seedling fa-3x text-success mb-3"></i>
+                        <h5 class="fw-bold">${p.nombre}</h5>
+                        <p>${p.superficie_ha} ha</p>
+                        <button class="btn btn-outline-primary w-100 mb-2" onclick="verDetalleParcela(${p.parcela_id})">Diagnosticar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="borrarParcela(${p.parcela_id})"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            cont.appendChild(div);
+        });
+    } catch(e) { console.error(e); }
 }
 
-// 2. FUNCIONES DE BORRAR
-async function borrarAgricultor(id) {
-    if(!confirm("¿Seguro? Se borrarán también todas sus parcelas.")) return;
-    
-    await fetch(`/delete/agricultor/${id}`, { method: 'POST' });
-    window.location.reload(); // Recargar para ver cambios
+async function verDetalleParcela(id) {
+    mostrarSeccion('detalle');
+    document.getElementById('det-nombre-parcela').innerText = "Cargando...";
+    try {
+        const res = await fetch(`/api/parcela/${id}/full-data`);
+        const data = await res.json();
+        document.getElementById('det-nombre-parcela').innerText = data.parcela?.nombre || 'Parcela';
+        
+        const w = document.querySelector('.weather-widget');
+        if(w && data.clima) {
+            w.innerHTML = `<div class="card bg-info text-white p-3 d-flex justify-content-between align-items-center"><div><h2 class="mb-0">${data.clima.temp}°C</h2><span>${data.clima.desc}</span></div><img src="https://openweathermap.org/img/wn/${data.clima.icon}@2x.png" width="60"></div>`;
+        }
+
+        const l = data.lectura || {};
+        document.getElementById('val-ph').innerText = l.ph || '--';
+        document.getElementById('val-hum').innerText = (l.humedad_suelo || '--') + '%';
+        document.getElementById('val-temp').innerText = (l.temperatura || '--') + '°C';
+
+        const btn = document.querySelector('.btn-ai');
+        const box = document.getElementById('ai-result');
+        if(box) { box.style.display='none'; box.innerHTML=''; }
+        if(btn) {
+            const nBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(nBtn, btn);
+            nBtn.onclick = () => generarRecomendacion(id);
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function generarRecomendacion(id) {
+    const btn = document.querySelector('.btn-ai');
+    const box = document.getElementById('ai-result');
+    btn.disabled = true; btn.innerHTML = 'Analizando...';
+    try {
+        const res = await fetch(`/api/parcela/${id}/recomendacion-ia`, { method: 'POST' });
+        const d = await res.json();
+        box.style.display = 'block'; box.className = 'alert alert-light border mt-3';
+        box.innerHTML = `<strong>Diagnóstico IA:</strong><br>${d.recomendacion || d.mensaje}`;
+    } catch(e) { box.innerHTML = 'Error IA'; } finally { btn.disabled = false; btn.innerHTML = 'Generar Diagnóstico'; }
 }
 
 async function borrarParcela(id) {
-    if(!confirm("¿Borrar parcela?")) return;
-    
-    await fetch(`/delete/parcela/${id}`, { method: 'POST' });
-    // Recargamos solo la vista de parcelas (truco rápido: recargar página)
-    window.location.reload();
+    if(confirm("¿Eliminar?")) { await fetch(`/delete/parcela/${id}`, { method: 'POST' }); if(agricultorActualID) verParcelasDe('', agricultorActualID); else window.location.reload(); }
 }
 
-// 3. FUNCIÓN EDITAR AGRICULTOR
-function abrirEditarAgricultor(id, nombre, apellido, ubicacion) {
-    // Rellenamos el modal con los datos actuales
+async function borrarAgricultor(id) {
+    if(confirm("¿Eliminar agricultor?")) { await fetch(`/delete/agricultor/${id}`, { method: 'POST' }); window.location.reload(); }
+}
+
+function abrirEditarAgricultor(id, n, a, u) {
     document.getElementById('edit_agri_id').value = id;
-    document.getElementById('edit_agri_nombre').value = nombre;
-    document.getElementById('edit_agri_apellido').value = apellido;
-    document.getElementById('edit_agri_ubicacion').value = ubicacion;
-    
-    openModal('modalEditarAgricultor');
+    document.getElementById('edit_agri_nombre').value = n;
+    document.getElementById('edit_agri_apellido').value = a;
+    document.getElementById('edit_agri_ubicacion').value = u;
+    const m = new bootstrap.Modal(document.getElementById('modalEditarAgricultor'));
+    m.show();
 }
