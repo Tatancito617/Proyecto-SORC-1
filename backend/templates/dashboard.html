@@ -158,15 +158,31 @@
         </div>
 
         <div id="panel-detalle-parcela" style="display:none;">
-            <div class="d-flex align-items-center mb-3">
-                <button class="btn btn-outline-secondary me-3" onclick="mostrarSeccion('parcelas')"><i class="fas fa-arrow-left"></i></button>
-                <h2 class="fw-bold" id="det-nombre-parcela">Detalle</h2>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-outline-secondary me-3" onclick="mostrarSeccion('parcelas')">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h2 class="fw-bold m-0" id="det-nombre-parcela">Detalle</h2>
+                </div>
+                
+                <a id="btn-directions" href="#" target="_blank" class="btn btn-primary shadow-sm">
+                    <i class="fas fa-location-arrow"></i> Cómo llegar
+                </a>
             </div>
             <div class="weather-widget mb-4"></div>
             <div class="row text-center mb-4">
-                <div class="col-4"><div class="card p-3 border-primary border-bottom border-4"><h5>pH</h5><h3 class="text-primary" id="val-ph">--</h3></div></div>
-                <div class="col-4"><div class="card p-3 border-info border-bottom border-4"><h5>Humedad</h5><h3 class="text-info" id="val-hum">--%</h3></div></div>
-                <div class="col-4"><div class="card p-3 border-danger border-bottom border-4"><h5>Temp</h5><h3 class="text-danger" id="val-temp">--°C</h3></div></div>
+                <div class="col-md-3 mb-3">
+                    <div class="card p-3 border-success border-bottom border-4 h-100">
+                        <h5>🌾 Cultivo</h5>
+                        <h4 class="text-success fw-bold" id="val-cultivo">--</h4>
+                        <small id="val-fecha-siembra" class="text-muted">--</small>
+                        <button class="btn btn-sm btn-outline-success mt-2" onclick="abrirModalRotacion()">🔄 Rotar</button>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3"><div class="card p-3 border-primary border-bottom border-4 h-100"><h5>pH</h5><h3 class="text-primary" id="val-ph">--</h3></div></div>
+                <div class="col-md-3 mb-3"><div class="card p-3 border-info border-bottom border-4 h-100"><h5>Humedad</h5><h3 class="text-info" id="val-hum">--%</h3></div></div>
+                <div class="col-md-3 mb-3"><div class="card p-3 border-danger border-bottom border-4 h-100"><h5>Temp</h5><h3 class="text-danger" id="val-temp">--°C</h3></div></div>
             </div>
             <div class="card card-box border-0 shadow-lg p-3">
                 <h5><i class="fas fa-brain text-warning"></i> IA Agrónomo</h5>
@@ -197,11 +213,145 @@
         </div>
     </div>
 
-    <div class="modal fade" id="modalAgricultor" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/add/agricultor" method="POST"><div class="modal-header bg-primary text-white"><h5 class="modal-title">Nuevo Agricultor</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="text" name="nombre" class="form-control mb-2" placeholder="Nombre" required><input type="text" name="apellido" class="form-control mb-2" placeholder="Apellido" required><input type="email" name="email" class="form-control mb-2" placeholder="Email"><input type="text" name="ubicacion" class="form-control" placeholder="Ubicación"></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div>
+    <div class="modal fade" id="modalAgricultor" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/add/agricultor" method="POST">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Nuevo Agricultor</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="text" name="nombre" class="form-control mb-2" placeholder="Nombre" required>
+                        <input type="text" name="apellido" class="form-control mb-2" placeholder="Apellido" required>
+                        <input type="email" name="email" class="form-control mb-2" placeholder="Email">
+                        <input type="text" name="ubicacion" class="form-control" placeholder="Ubicación">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
-    <div class="modal fade" id="modalEditarAgricultor" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/edit/agricultor" method="POST"><div class="modal-header bg-warning"><h5 class="modal-title">Editar Agricultor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="agricultor_id" id="edit_agri_id"><input type="text" name="nombre" id="edit_agri_nombre" class="form-control mb-2" required><input type="text" name="apellido" id="edit_agri_apellido" class="form-control mb-2" required><input type="text" name="ubicacion" id="edit_agri_ubicacion" class="form-control"></div><div class="modal-footer"><button type="submit" class="btn btn-warning">Actualizar</button></div></form></div></div></div>
+    <div class="modal fade" id="modalEditarAgricultor" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/edit/agricultor" method="POST">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title">Editar Agricultor</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="agricultor_id" id="edit_agri_id">
+                        <input type="text" name="nombre" id="edit_agri_nombre" class="form-control mb-2" required>
+                        <input type="text" name="apellido" id="edit_agri_apellido" class="form-control mb-2" required>
+                        <input type="text" name="ubicacion" id="edit_agri_ubicacion" class="form-control">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-warning">Actualizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-    <div class="modal fade" id="modalParcela" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form action="/add/parcela" method="POST"><div class="modal-header bg-success text-white"><h5 class="modal-title">Nueva Parcela</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="agricultor_id" id="input_agri_id_parcela"><div class="row"><div class="col-md-6"><input type="text" name="nombre" class="form-control mb-2" placeholder="Nombre Parcela" required><input type="number" step="0.1" name="superficie" class="form-control mb-2" placeholder="Hectáreas" required><div class="input-group mb-2"><input type="text" id="buscadorMapa" class="form-control" placeholder="Buscar ciudad..."><button type="button" class="btn btn-secondary" onclick="buscarEnMapa()">Ir</button></div><input type="text" name="latitud" id="input_lat" class="form-control mb-1" placeholder="Lat" readonly><input type="text" name="longitud" id="input_lon" class="form-control" placeholder="Lon" readonly></div><div class="col-md-6"><div id="mapaSelector"></div></div></div></div><div class="modal-footer"><button type="submit" class="btn btn-success">Guardar</button></div></form></div></div></div>
+    <div class="modal fade" id="modalParcela" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form action="/add/parcela" method="POST">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">Nueva Parcela</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    
+                    <div class="modal-body">
+                        <input type="hidden" name="agricultor_id" id="input_agri_id_parcela">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-3">Datos Generales</h6>
+                                <input type="text" name="nombre" class="form-control mb-2" placeholder="Nombre Parcela" required>
+                                <input type="number" step="0.1" name="superficie" class="form-control mb-3" placeholder="Hectáreas" required>
+                                
+                                <div class="p-3 bg-light rounded border mb-3">
+                                    <label class="form-label fw-bold">¿Tiene cultivos?</label>
+                                    <div class="d-flex gap-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="tiene_cultivo" value="si" onclick="toggleCultivo(true)">
+                                            <label class="form-check-label">Sí</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="tiene_cultivo" value="no" checked onclick="toggleCultivo(false)">
+                                            <label class="form-check-label">No </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="inputs-cultivo" style="display:none;">
+                                        <input type="text" name="nombre_cultivo" class="form-control mb-2 form-control-sm" placeholder="¿Qué cultivo es? (Ej: Maíz)">
+                                        <label class="small text-muted">Fecha Siembra:</label>
+                                        <input type="date" name="fecha_siembra" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+
+                                <div class="input-group mb-2">
+                                    <input type="text" id="buscadorMapa" class="form-control" placeholder="Buscar ciudad...">
+                                    <button type="button" class="btn btn-secondary" onclick="buscarEnMapa()">Ir</button>
+                                </div>
+                                <input type="text" name="latitud" id="input_lat" class="form-control mb-1" placeholder="Lat" readonly>
+                                <input type="text" name="longitud" id="input_lon" class="form-control" placeholder="Lon" readonly>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div id="mapaSelector" style="height: 100%; min-height: 300px; border-radius: 8px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-success">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalRotacion" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/api/parcela/rotar-cultivo" method="POST">
+                    <input type="hidden" name="parcela_id" id="rotar_parcela_id">
+                    <div class="modal-header">
+                        <h5 class="modal-title">🔄 Gestión de Cultivo</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Qué deseas hacer con el cultivo actual?</p>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="accion" value="limpiar" checked onclick="document.getElementById('nuevo-cultivo-div').style.display='none'">
+                            <label class="form-check-label">Solo cosechar/limpiar (Dejar suelo desnudo)</label>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="accion" value="nuevo" onclick="document.getElementById('nuevo-cultivo-div').style.display='block'">
+                            <label class="form-check-label">Rotar (Sembrar algo nuevo)</label>
+                        </div>
+
+                        <div id="nuevo-cultivo-div" style="display:none; background: #f0fdf4; padding: 15px; border-radius: 8px;">
+                            <label>Nombre Nuevo Cultivo</label>
+                            <input type="text" name="nuevo_nombre_cultivo" class="form-control mb-2">
+                            <label>Fecha Siembra</label>
+                            <input type="date" name="nueva_fecha_siembra" class="form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

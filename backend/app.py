@@ -8,7 +8,7 @@ import requests
 import openai
 from openai import OpenAI
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 API_KEY_WEATHER = "942cb8c1379c7ac70368698f4554c245"
 
 load_dotenv()
@@ -166,8 +166,22 @@ def edit_agricultor():
 def add_parcela():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO parcelas (nombre, superficie_ha, latitud, longitud, agricultor_id) VALUES (%s, %s, %s, %s, %s)",
-                   (request.form['nombre'], request.form['superficie'], request.form['latitud'], request.form['longitud'], request.form['agricultor_id']))
+    
+    sql_parcela = "INSERT INTO parcelas (nombre, superficie_ha, latitud, longitud, agricultor_id) VALUES (%s, %s, %s, %s, %s)"
+    val_parcela = (request.form['nombre'], request.form['superficie'], request.form['latitud'], request.form['longitud'], request.form['agricultor_id'])
+    cursor.execute(sql_parcela, val_parcela)
+    
+    parcela_id = cursor.lastrowid
+
+    tiene_cultivo = request.form.get('tiene_cultivo')
+    
+    if tiene_cultivo == 'si':
+        nombre_cultivo = request.form['nombre_cultivo']
+        fecha_siembra = request.form['fecha_siembra']
+        
+        sql_cultivo = "INSERT INTO cultivos (parcela_id, nombre, fecha_siembra, estado) VALUES (%s, %s, %s, 'activo')"
+        cursor.execute(sql_cultivo, (parcela_id, nombre_cultivo, fecha_siembra))
+
     conn.commit()
     conn.close()
     return redirect(url_for('dashboard_page'))
@@ -180,6 +194,26 @@ def delete_parcela(id):
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
+
+@app.route('/api/parcela/rotar-cultivo', methods=['POST'])
+def rotar_cultivo():
+    parcela_id = request.form['parcela_id']
+    accion = request.form['accion']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("UPDATE cultivos SET estado = 'cosechado' WHERE parcela_id = %s AND estado = 'activo'", (parcela_id,))
+    
+    if accion == 'nuevo':
+        nombre = request.form['nuevo_nombre_cultivo']
+        fecha = request.form['nueva_fecha_siembra']
+        cursor.execute("INSERT INTO cultivos (parcela_id, nombre, fecha_siembra, estado) VALUES (%s, %s, %s, 'activo')", 
+                       (parcela_id, nombre, fecha))
+    
+    conn.commit()
+    conn.close()
+    return redirect("/agricultores")
 
 @app.route('/api/agricultor/<int:id>/parcelas')
 def get_parcelas_by_agricultor(id):
@@ -201,6 +235,12 @@ def get_parcela_full_data(parcela_id):
     if parcela:
         cursor.execute("SELECT * FROM lecturas_sensor WHERE parcela_id = %s ORDER BY fecha_registro DESC LIMIT 1", (parcela_id,))
         lectura = cursor.fetchone()
+
+    cultivo = None
+    if parcela:
+        cursor.execute("SELECT * FROM cultivos WHERE parcela_id = %s AND estado = 'activo' LIMIT 1", (parcela_id,))
+        cultivo = cursor.fetchone()
+
     conn.close()
 
     clima_info = None 
@@ -213,7 +253,7 @@ def get_parcela_full_data(parcela_id):
                 clima_info = { "temp": round(d['main']['temp'], 1), "desc": d['weather'][0]['description'], "icon": d['weather'][0]['icon'], "humedad": d['main']['humidity'] }
         except Exception: pass
     
-    return jsonify({ "parcela": parcela, "lectura": lectura, "clima": clima_info })
+    return jsonify({ "parcela": parcela, "lectura": lectura, "clima": clima_info, "cultivo": cultivo })
 
 @app.route('/api/sensor/lectura', methods=['POST'])
 def recibir_lectura():
@@ -240,25 +280,28 @@ def get_recomendacion_ia(parcela_id):
     
     cursor.execute("SELECT * FROM parcelas WHERE parcela_id = %s", (parcela_id,))
     parcela = cursor.fetchone()
+
+    cursor.execute("SELECT * FROM cultivos WHERE parcela_id = %s AND estado = 'activo' LIMIT 1", (parcela_id,))
+    cultivo_data = cursor.fetchone()
     conn.close()
+
+    info_cultivo = "Suelo desnudo (Sin cultivo activo)"
+    if cultivo_data:
+        info_cultivo = f"CULTIVO ACTIVO: {cultivo_data['nombre']} (Sembrado: {cultivo_data['fecha_siembra']})"
 
     if not lectura:
         return jsonify({"mensaje": "Faltan datos del sensor."})
 
-    # 2. CLIMA (URLs LIMPIAS)
+    # 2. CLIMA
     clima_actual_desc = "Desconocido"
     resumen_pronostico = "No disponible"
 
     if parcela and parcela.get('latitud'):
         try:
-            # Convertimos a float para evitar errores de espacios
             lat = float(parcela['latitud'])
             lon = float(parcela['longitud'])
             
-            # --- AQUÍ ESTABA EL ERROR: URLs LIMPIAS ---
-            # Asegúrate de que API_KEY_WEATHER esté definida arriba en tu archivo
-            
-            # A. Clima Actual
+            # Clima Actual
             url_now = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY_WEATHER}&units=metric&lang=es"
             
             res_now = requests.get(url_now, timeout=5)
@@ -266,7 +309,7 @@ def get_recomendacion_ia(parcela_id):
                 data_now = res_now.json()
                 clima_actual_desc = f"{data_now['weather'][0]['description']}, {data_now['main']['temp']}°C"
 
-            # B. Pronóstico
+            # Pronóstico
             url_forecast = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={API_KEY_WEATHER}&units=metric&lang=es"
             
             res_fore = requests.get(url_forecast, timeout=5)
@@ -274,7 +317,7 @@ def get_recomendacion_ia(parcela_id):
                 data_fore = res_fore.json()
                 lista = data_fore['list']
                 proyecciones = []
-                # Tomamos índices 8 (24h), 16 (48h) y 24 (72h)
+                # 8 (24h), 16 (48h) y 24 (72h)
                 for i in [8, 16, 24]: 
                     if i < len(lista):
                         item = lista[i]
@@ -290,9 +333,12 @@ def get_recomendacion_ia(parcela_id):
         except Exception as e:
             print(f"Error clima URL: {e}")
 
-    # 4. PROMPT CORREGIDO (Sin Markdown)
+    # 4. PROMPT
     prompt = f"""
     Actúa como un Ingeniero Agrónomo experto. Tienes los siguientes datos reales de la parcela '{parcela['nombre']}':
+
+    [CONTEXTO AGRÍCOLA]
+    - {info_cultivo}  <-- ¡ESTO ES CLAVE!
     
     [DATOS SUELO]
     - pH: {lectura['ph']}
@@ -305,6 +351,9 @@ def get_recomendacion_ia(parcela_id):
     {resumen_pronostico}
 
     [TAREA]
+    IMPORTANTE: 
+    Si hay cultivo, di si el pH y humedad actuales son buenos para ESE cultivo específico.
+    Si NO hay cultivo, recomienda qué sembrar basándote en el suelo.
     Escribe un diagnóstico agronómico DETALLADO y REAL.
     Cruza los datos: Si el pH es malo, recomiendalo corregir. Si va a llover, no recomiendes regar.
     
@@ -342,8 +391,7 @@ def get_recomendacion_ia(parcela_id):
         
         recomendacion = response.choices[0].message.content
         
-        # 5. LIMPIEZA DE SEGURIDAD (El truco final)
-        # Si la IA desobedece y manda ```html, lo borramos a la fuerza.
+        # LIMPIEZA DE SEGURIDAD
         recomendacion = recomendacion.replace("```html", "").replace("```", "").strip()
 
         return jsonify({"recomendacion": recomendacion, "status": "success"})

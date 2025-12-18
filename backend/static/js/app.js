@@ -191,12 +191,26 @@ async function verParcelasDe(nombre, id) {
 }
 
 async function verDetalleParcela(id) {
+    idParcelaActual = id;
     mostrarSeccion('detalle');
     document.getElementById('det-nombre-parcela').innerText = "Cargando...";
+    const btnMaps = document.getElementById('btn-directions');
+    btnMaps.style.display = 'none'; 
+    btnMaps.href = '#';
+
     try {
         const res = await fetch(`/api/parcela/${id}/full-data`);
         const data = await res.json();
         document.getElementById('det-nombre-parcela').innerText = data.parcela?.nombre || 'Parcela';
+
+        if (data.parcela && data.parcela.latitud && data.parcela.longitud) {
+            const lat = data.parcela.latitud;
+            const lon = data.parcela.longitud;
+            
+            btnMaps.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+            
+            btnMaps.style.display = 'inline-flex'; 
+        }
         
         const w = document.querySelector('.weather-widget');
         if(w && data.clima) {
@@ -207,6 +221,18 @@ async function verDetalleParcela(id) {
         document.getElementById('val-ph').innerText = l.ph || '--';
         document.getElementById('val-hum').innerText = (l.humedad_suelo || '--') + '%';
         document.getElementById('val-temp').innerText = (l.temperatura || '--') + '°C';
+
+        // --- NUEVO: PINTAR EL CULTIVO ---
+        if (data.cultivo) {
+            document.getElementById('val-cultivo').innerText = data.cultivo.nombre;
+            // Formatear fecha simple
+            const fecha = new Date(data.cultivo.fecha_siembra).toLocaleDateString();
+            document.getElementById('val-fecha-siembra').innerText = `Sembrado: ${fecha}`;
+        } else {
+            document.getElementById('val-cultivo').innerText = "Sin Cultivo";
+            document.getElementById('val-fecha-siembra').innerText = "Suelo Desnudo";
+        }
+        // --------------------------------
 
         const btn = document.querySelector('.btn-ai');
         const box = document.getElementById('ai-result');
@@ -246,4 +272,27 @@ function abrirEditarAgricultor(id, n, a, u) {
     document.getElementById('edit_agri_ubicacion').value = u;
     const m = new bootstrap.Modal(document.getElementById('modalEditarAgricultor'));
     m.show();
+}
+
+function toggleCultivo(mostrar) {
+    const div = document.getElementById('inputs-cultivo');
+    div.style.display = mostrar ? 'block' : 'none';
+    
+    const inputs = div.querySelectorAll('input');
+    inputs.forEach(input => input.required = mostrar);
+}
+
+let idParcelaActual = null;
+function abrirModalRotacion() {
+    console.log("Intentando rotar parcela ID:", idParcelaActual);
+    
+    if(!idParcelaActual) {
+        alert("Error: No se ha cargado el ID de la parcela.");
+        return;
+    }
+    
+    document.getElementById('rotar_parcela_id').value = idParcelaActual;
+    
+    const myModal = new bootstrap.Modal(document.getElementById('modalRotacion'));
+    myModal.show();
 }
