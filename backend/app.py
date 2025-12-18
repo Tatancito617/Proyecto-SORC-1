@@ -1,20 +1,24 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_cors import CORS
 import mysql.connector
-import os
 from dotenv import load_dotenv
 from datetime import datetime
 import requests
-import openai
+import os
+from dotenv import load_dotenv
 from openai import OpenAI
 
-client = OpenAI(api_key="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")
-API_KEY_WEATHER = "942cb8c1379c7ac70368698f4554c245"
-
-load_dotenv()
+load_dotenv() # Carga el archivo .env
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+app.secret_key = os.getenv('SECRET_KEY', 'clave_por_defecto_si_falla_el_env')
 CORS(app)
+
+# Clave de OpenWeather
+API_KEY_WEATHER = os.getenv('OPENWEATHER_API_KEY')
+
+# Clave de OpenAI
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -66,7 +70,6 @@ def home():
 def login_page():
     return render_template('login.html')
 
-# Todas estas rutas cargan el Dashboard para evitar error 404 al recargar
 @app.route('/dashboard')
 @app.route('/agricultores')
 @app.route('/parcelas')
@@ -131,13 +134,47 @@ def dashboard_page():
 
 @app.route('/add/agricultor', methods=['POST'])
 def add_agricultor():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO agricultores (nombre, apellido, email, ubicacion) VALUES (%s, %s, %s, %s)",
-                   (request.form['nombre'], request.form['apellido'], request.form['email'], request.form['ubicacion']))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('dashboard_page'))
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Recogemos los datos (incluyendo el RUT nuevo)
+        rut = request.form['rut']
+        nombre = request.form['nombre']
+        apellido = request.form['apellido']
+        email = request.form['email']
+        ubicacion = request.form['ubicacion']
+
+        # 2. Insertamos el RUT en la base de datos
+        sql = """
+            INSERT INTO agricultores (rut_agri, nombre, apellido, email, ubicacion) 
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql, (rut, nombre, apellido, email, ubicacion))
+        conn.commit()
+        
+        flash('Agricultor agregado correctamente.', 'success')
+
+    except mysql.connector.Error as err:
+        # --- AQUÍ ESTÁ LA MAGIA ---
+        # El código 1062 significa "Entrada Duplicada" en MySQL
+        if err.errno == 1062:
+            # Usamos categoría 'warning' para que salga amarillo (alerta) en vez de rojo
+            flash(f'⚠️ Advertencia: El RUT {rut} ya se encuentra registrado en el sistema.', 'warning')
+        else:
+            flash(f'Error de base de datos: {err}', 'danger')
+            print(f"Error DB: {err}")
+
+    except Exception as e:
+        flash(f'Error inesperado: {str(e)}', 'danger')
+        print(f"Error Python: {e}")
+
+    finally:
+        if conn and conn.is_connected():
+            cursor.close()
+            conn.close()
+    return redirect("/agricultores")
 
 @app.route('/delete/agricultor/<int:id>', methods=['POST'])
 def delete_agricultor(id):

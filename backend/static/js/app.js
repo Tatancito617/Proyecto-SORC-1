@@ -1,34 +1,56 @@
+
 // ==========================================
 // 1. GESTIÓN DE SESIÓN Y NAVEGACIÓN
 // ==========================================
+function checkRut(rut) {
+    var valor = rut.value.replace(/\./g,'').replace(/-/g,'');
+    
+    if (valor.length === 0) { return; }
+
+    var cuerpo = valor.slice(0,-1);
+    var dv = valor.slice(-1).toUpperCase();
+    rut.value = cuerpo + '-'+ dv;
+
+    if(cuerpo.length < 7) { rut.value = valor; return; }
+
+    cuerpo = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    rut.value = cuerpo + '-' + dv;
+}
 
 async function handleLogin(event) {
     event.preventDefault();
-    const rut = document.getElementById('rutInput').value;
-    const password = document.getElementById('passwordInput').value;
+    
+    const rutInput = document.getElementById('rutInput');
+    const rut = rutInput.value.trim(); 
+    const password = document.getElementById('passwordInput').value.trim();
     const errorMsg = document.getElementById('loginError');
+
+    if (rut.length < 8) {
+        errorMsg.style.display = 'block';
+        errorMsg.innerText = "El RUT ingresado es muy corto.";
+        return;
+    }
 
     try {
         const response = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rut: rut, password: password })
+            body: JSON.stringify({ rut: rut, password: password }) 
         });
         
         const data = await response.json();
 
         if (response.ok) {
-            // Guardar sesión en navegador
             localStorage.setItem('usuarioActivo', JSON.stringify(data.usuario));
             window.location.href = "/dashboard"; 
         } else {
             errorMsg.style.display = 'block';
-            errorMsg.innerText = data.mensaje;
+            errorMsg.innerText = data.mensaje || "Credenciales incorrectas";
         }
     } catch (error) {
         console.error("Error:", error);
         errorMsg.style.display = 'block';
-        errorMsg.innerText = "Error de conexión";
+        errorMsg.innerText = "Error de conexión con el servidor";
     }
 }
 
