@@ -8,7 +8,7 @@ import requests
 import openai
 from openai import OpenAI
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 API_KEY_WEATHER = "942cb8c1379c7ac70368698f4554c245"
 
 load_dotenv()
@@ -231,10 +231,126 @@ def recibir_lectura():
 
 @app.route('/api/parcela/<int:parcela_id>/recomendacion-ia', methods=['POST'])
 def get_recomendacion_ia(parcela_id):
+    # 1. Conexión y obtención de datos
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("SELECT * FROM lecturas_sensor WHERE parcela_id = %s ORDER BY fecha_registro DESC LIMIT 1", (parcela_id,))
+    lectura = cursor.fetchone()
+    
+    cursor.execute("SELECT * FROM parcelas WHERE parcela_id = %s", (parcela_id,))
+    parcela = cursor.fetchone()
+    conn.close()
+
+    if not lectura:
+        return jsonify({"mensaje": "Faltan datos del sensor."})
+
+    # 2. CLIMA (URLs LIMPIAS)
+    clima_actual_desc = "Desconocido"
+    resumen_pronostico = "No disponible"
+
+    if parcela and parcela.get('latitud'):
+        try:
+            # Convertimos a float para evitar errores de espacios
+            lat = float(parcela['latitud'])
+            lon = float(parcela['longitud'])
+            
+            # --- AQUÍ ESTABA EL ERROR: URLs LIMPIAS ---
+            # Asegúrate de que API_KEY_WEATHER esté definida arriba en tu archivo
+            
+            # A. Clima Actual
+            url_now = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY_WEATHER}&units=metric&lang=es"
+            
+            res_now = requests.get(url_now, timeout=5)
+            if res_now.status_code == 200:
+                data_now = res_now.json()
+                clima_actual_desc = f"{data_now['weather'][0]['description']}, {data_now['main']['temp']}°C"
+
+            # B. Pronóstico
+            url_forecast = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={API_KEY_WEATHER}&units=metric&lang=es"
+            
+            res_fore = requests.get(url_forecast, timeout=5)
+            if res_fore.status_code == 200:
+                data_fore = res_fore.json()
+                lista = data_fore['list']
+                proyecciones = []
+                # Tomamos índices 8 (24h), 16 (48h) y 24 (72h)
+                for i in [8, 16, 24]: 
+                    if i < len(lista):
+                        item = lista[i]
+                        fecha = item['dt_txt'].split(" ")[0]
+                        desc = item['weather'][0]['description']
+                        temp = item['main']['temp']
+                        pop = item.get('pop', 0) * 100
+                        proyecciones.append(f"- Día {fecha}: {desc}, {temp}°C (Lluvia: {int(pop)}%)")
+                
+                if proyecciones:
+                    resumen_pronostico = "\n".join(proyecciones)
+
+        except Exception as e:
+            print(f"Error clima URL: {e}")
+
+    # 4. PROMPT CORREGIDO (Sin Markdown)
+    prompt = f"""
+    Actúa como un Ingeniero Agrónomo experto. Tienes los siguientes datos reales de la parcela '{parcela['nombre']}':
+    
+    [DATOS SUELO]
+    - pH: {lectura['ph']}
+    - Humedad Suelo: {lectura['humedad_suelo']}%
+    - Temperatura Suelo: {lectura['temperatura']}°C
+    
+    [DATOS CLIMA]
+    - Actual: {clima_actual_desc}
+    - Pronóstico (3 días): 
+    {resumen_pronostico}
+
+    [TAREA]
+    Escribe un diagnóstico agronómico DETALLADO y REAL.
+    Cruza los datos: Si el pH es malo, recomiendalo corregir. Si va a llover, no recomiendes regar.
+    
+    [FORMATO OBLIGATORIO]
+    Responde ÚNICAMENTE con código HTML (sin markdown). Usa esta estructura exacta pero REEMPLAZA EL CONTENIDO con tu análisis:
+
+    <h3>Informe Agronómico: {parcela['nombre']}</h3>
+    
+    <h4>🔍 Diagnóstico Integral</h4>
+    <p>
+    AQUÍ ESCRIBE TU ANÁLISIS: Explica detalladamente la relación entre el pH de {lectura['ph']} y la humedad actual. Menciona explícitamente si el pronóstico del clima ayuda o empeora la situación.
+    </p>
+    
+    <h4>💧 Plan de Riego Inteligente</h4>
+    <p>
+    AQUÍ ESCRIBE TU PLAN: Da instrucciones precisas de riego basadas en la probabilidad de lluvia que te mostré arriba. ¿Se debe regar hoy o esperar?
+    </p>
+
+    <h4>🛠️ Manejo de Suelo y Cultivos</h4>
+    <p>
+    AQUÍ ESCRIBE TUS CONSEJOS: Recomienda qué hacer para corregir el pH (ej. encalado o acidificación) y sugiere 3 cultivos ideales para este suelo y clima específico.
+    </p>
+    """
+
     try:
-        return jsonify({"recomendacion": "<b>Diagnóstico:</b> Suelo con pH estable.<br><b>Recomendación:</b> Monitorear riego.", "status": "success"})
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo", 
+            messages=[
+                {"role": "system", "content": "Eres un sistema backend que devuelve HTML puro sin formato markdown."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=900, 
+            temperature=0.7
+        )
+        
+        recomendacion = response.choices[0].message.content
+        
+        # 5. LIMPIEZA DE SEGURIDAD (El truco final)
+        # Si la IA desobedece y manda ```html, lo borramos a la fuerza.
+        recomendacion = recomendacion.replace("```html", "").replace("```", "").strip()
+
+        return jsonify({"recomendacion": recomendacion, "status": "success"})
+
     except Exception as e:
-        return jsonify({"mensaje": "Error IA"}), 500
+        print(f"Error OpenAI: {e}")
+        return jsonify({"mensaje": "Error en el análisis inteligente."}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

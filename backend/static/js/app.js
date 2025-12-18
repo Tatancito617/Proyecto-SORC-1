@@ -64,10 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const u = JSON.parse(data);
         const lbl = document.getElementById('navNombreUsuario');
         if(lbl) lbl.innerText = u.nombre.split(' ')[0];
-    } else {
-        // Si no hay login y estamos en dashboard, podrías forzar redirect:
-        // if(window.location.pathname.includes('/dashboard')) window.location.href = "/login";
-    }
+    } 
 
     // Navegación URL
     const path = window.location.pathname;
