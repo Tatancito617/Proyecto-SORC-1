@@ -31,7 +31,6 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="fas fa-home"></i> Inicio</a></li>
                     <li class="nav-item"><a class="nav-link" href="/agricultores"><i class="fas fa-users"></i> Agricultores</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/parcelas"><i class="fas fa-layer-group"></i> Parcelas</a></li>
                 </ul>
                 <div class="d-flex align-items-center">
                     <div class="dropdown">
@@ -73,9 +72,6 @@
         <div id="panel-resumen">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="fw-bold text-secondary">Dashboard General</h3>
-                <button class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#modalAgricultor">
-                    <i class="fas fa-plus"></i> Nuevo Agricultor
-                </button>
             </div>
 
             <div class="row g-4 mb-4">
@@ -114,7 +110,7 @@
                 </div>
                 <div class="col-lg-7">
                     <div class="card card-box h-100">
-                        <div class="card-header bg-white fw-bold border-0"><i class="fas fa-temperature-high text-danger me-2"></i> Historial Ambiental</div>
+                        <div class="card-header bg-white fw-bold border-0"><i class="fas fa-temperature-high text-danger me-2"></i> Historial Condiciones del Suelo</div>
                         <div class="card-body"><div class="chart-container"><canvas id="graficoLecturas"></canvas></div></div>
                     </div>
                 </div>
@@ -130,9 +126,9 @@
                             <tr>
                                 <td>{{ lect.fecha_registro }}</td>
                                 <td>Parcela #{{ lect.parcela_id }}</td>
-                                <td><span class="badge bg-danger">{{ lect.temperatura }}°C</span></td>
-                                <td><span class="badge bg-primary">{{ lect.humedad_suelo }}%</span></td>
-                                <td>{{ lect.ph }}</td>
+                                <td><span class="badge bg-danger">🌡️{{ lect.temperatura }}°C</span></td>
+                                <td><span class="badge bg-primary">💧{{ lect.humedad_suelo }}%</span></td>
+                                <td>🧪{{ lect.ph }}</td>
                             </tr>
                             {% else %}
                             <tr><td colspan="5" class="text-center">Sin datos</td></tr>
@@ -146,7 +142,9 @@
         <div id="panel-lista-agricultores" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3><i class="fas fa-users text-primary"></i> Agricultores</h3>
-                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAgricultor">Nuevo</button>
+                <button class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#modalAgricultor">
+                    <i class="fas fa-plus"></i> Nuevo Agricultor
+                </button>
             </div>
             <div class="row">
                 {% for agri in agricultores %}
@@ -198,9 +196,9 @@
                         <button class="btn btn-sm btn-outline-success mt-2" onclick="abrirModalRotacion()">🔄 Rotar</button>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3"><div class="card p-3 border-primary border-bottom border-4 h-100"><h5>pH</h5><h3 class="text-primary" id="val-ph">--</h3></div></div>
-                <div class="col-md-3 mb-3"><div class="card p-3 border-info border-bottom border-4 h-100"><h5>Humedad</h5><h3 class="text-info" id="val-hum">--%</h3></div></div>
-                <div class="col-md-3 mb-3"><div class="card p-3 border-danger border-bottom border-4 h-100"><h5>Temp</h5><h3 class="text-danger" id="val-temp">--°C</h3></div></div>
+                <div class="col-md-3 mb-3"><div class="card p-3 border-primary border-bottom border-4 h-100"><h5>🧪pH</h5><h3 class="text-primary" id="val-ph">--</h3></div></div>
+                <div class="col-md-3 mb-3"><div class="card p-3 border-info border-bottom border-4 h-100"><h5>💧Humedad</h5><h3 class="text-info" id="val-hum">--%</h3></div></div>
+                <div class="col-md-3 mb-3"><div class="card p-3 border-danger border-bottom border-4 h-100"><h5>🌡️Temp</h5><h3 class="text-danger" id="val-temp">--°C</h3></div></div>
             </div>
             <div class="card card-box border-0 shadow-lg p-3">
                 <h5><i class="fas fa-brain text-warning"></i> IA Agrónomo</h5>

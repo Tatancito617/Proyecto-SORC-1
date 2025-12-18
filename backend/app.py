@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session
 from flask_cors import CORS
 import mysql.connector
 from dotenv import load_dotenv
@@ -7,6 +7,7 @@ import requests
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+from functools import wraps
 
 load_dotenv() # Carga el archivo .env
 
@@ -32,6 +33,15 @@ def get_db_connection():
 # ==========================================
 # LOGIN (API)
 # ==========================================
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/api/login', methods=['POST'])
 def login_api():
     try:
@@ -46,6 +56,10 @@ def login_api():
         conn.close() 
         
         if usuario and usuario['password'] == password:
+            session['usuario_id'] = usuario['usuario_id']
+            session['nombre'] = usuario['nombre']
+            session['rol'] = usuario.get('rol', 'Agricultor')
+
             datos_usuario = {
                 "nombre": usuario['nombre'],
                 "rut": usuario['rut'],
@@ -58,6 +72,10 @@ def login_api():
     except Exception as e:
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
 # ==========================================
 # VISTAS PRINCIPALES
 # ==========================================
@@ -68,14 +86,24 @@ def home():
 
 @app.route('/login')
 def login_page():
+    if 'usuario_id' in session:
+        return redirect(url_for('dashboard_page'))
     return render_template('login.html')
 
 @app.route('/dashboard')
+
 @app.route('/agricultores')
+
 @app.route('/parcelas')
+
 @app.route('/sensores')
+
 @app.route('/cultivos')
+
 @app.route('/mapa') 
+
+@app.route('/dashboard') 
+@login_required          
 def dashboard_page():
     try:
         conn = get_db_connection()
@@ -133,6 +161,7 @@ def dashboard_page():
 # ==========================================
 
 @app.route('/add/agricultor', methods=['POST'])
+@login_required
 def add_agricultor():
     conn = None
     try:
@@ -177,6 +206,7 @@ def add_agricultor():
     return redirect("/agricultores")
 
 @app.route('/delete/agricultor/<int:id>', methods=['POST'])
+@login_required
 def delete_agricultor(id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -186,6 +216,7 @@ def delete_agricultor(id):
     return jsonify({"status": "success"})
 
 @app.route('/edit/agricultor', methods=['POST'])
+@login_required
 def edit_agricultor():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -200,6 +231,7 @@ def edit_agricultor():
 # ==========================================
 
 @app.route('/add/parcela', methods=['POST'])
+@login_required
 def add_parcela():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -224,6 +256,7 @@ def add_parcela():
     return redirect(url_for('dashboard_page'))
 
 @app.route('/delete/parcela/<int:id>', methods=['POST'])
+@login_required
 def delete_parcela(id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -233,6 +266,7 @@ def delete_parcela(id):
     return jsonify({"status": "success"})
 
 @app.route('/api/parcela/rotar-cultivo', methods=['POST'])
+@login_required
 def rotar_cultivo():
     parcela_id = request.form['parcela_id']
     accion = request.form['accion']
@@ -253,6 +287,7 @@ def rotar_cultivo():
     return redirect("/agricultores")
 
 @app.route('/api/agricultor/<int:id>/parcelas')
+@login_required
 def get_parcelas_by_agricultor(id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -262,6 +297,7 @@ def get_parcelas_by_agricultor(id):
     return jsonify(parcelas)
 
 @app.route('/api/parcela/<int:parcela_id>/full-data')
+@login_required
 def get_parcela_full_data(parcela_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -293,20 +329,66 @@ def get_parcela_full_data(parcela_id):
     return jsonify({ "parcela": parcela, "lectura": lectura, "clima": clima_info, "cultivo": cultivo })
 
 @app.route('/api/sensor/lectura', methods=['POST'])
+@login_required
 def recibir_lectura():
     data = request.json
+    conn = None
+    
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO lecturas_sensor (sensor_id, parcela_id, temperatura, humedad_suelo, ph, bateria_nivel, fecha_registro) VALUES (%s, %s, %s, %s, %s, %s, NOW())",
-                       (data.get('sensor_id'), data.get('parcela_id'), data.get('temp'), data.get('hum'), data.get('ph'), data.get('bateria_nivel', 100)))
+        
+        # 1. NORMALIZACIÓN: Si data es un solo objeto, lo convertimos en una lista de 1
+        # Así el código de abajo funciona igual para 1 lectura o para 50.
+        if not isinstance(data, list):
+            data = [data]
+
+        print(f"Procesando {len(data)} lecturas...")
+
+        # 2. BUCLE PARA PROCESAR CADA LECTURA
+        for lectura in data:
+            # Extraemos los valores (con valores por defecto seguros)
+            sensor_id = lectura.get('sensor_id')
+            parcela_id = lectura.get('parcela_id')
+            temp = lectura.get('temp')
+            hum = lectura.get('hum')
+            ph = lectura.get('ph')
+            bat = lectura.get('bateria_nivel', 100)
+            fecha_manual = lectura.get('fecha') # Buscamos si trae fecha simulada
+
+            # 3. LÓGICA DE FECHA (Simulación vs Real)
+            if fecha_manual:
+                # Si trae fecha (Simulación), la insertamos explícitamente
+                sql = """
+                    INSERT INTO lecturas_sensor 
+                    (sensor_id, parcela_id, temperatura, humedad_suelo, ph, bateria_nivel, fecha_registro) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(sql, (sensor_id, parcela_id, temp, hum, ph, bat, fecha_manual))
+            else:
+                # Si NO trae fecha (Sensor Real), usamos NOW()
+                sql = """
+                    INSERT INTO lecturas_sensor 
+                    (sensor_id, parcela_id, temperatura, humedad_suelo, ph, bateria_nivel, fecha_registro) 
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                """
+                cursor.execute(sql, (sensor_id, parcela_id, temp, hum, ph, bat))
+
         conn.commit()
-        conn.close()
-        return jsonify({"status": "success"}), 201
+        return jsonify({"status": "success", "mensaje": f"{len(data)} lecturas guardadas"}), 201
+
     except Exception as e:
+        print(f"Error al guardar lectura: {e}")
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        # 4. CIERRE SEGURO (Evita el error de conexión perdida)
+        if conn and conn.is_connected():
+            cursor.close()
+            conn.close()
+
 @app.route('/api/parcela/<int:parcela_id>/recomendacion-ia', methods=['POST'])
+@login_required
 def get_recomendacion_ia(parcela_id):
     # 1. Conexión y obtención de datos
     conn = get_db_connection()

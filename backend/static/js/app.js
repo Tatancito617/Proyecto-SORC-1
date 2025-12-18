@@ -56,7 +56,8 @@ async function handleLogin(event) {
 
 function cerrarSesion() {
     localStorage.removeItem('usuarioActivo');
-    window.location.href = "/login";
+    
+    window.location.href = "/logout";
 }
 
 function verPerfil() {
