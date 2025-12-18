@@ -1,0 +1,32 @@
+.env
+.env.local
+config.py
+
+# --- Python ---
+# Archivos compilados (basura que genera Python al ejecutarse)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Entornos Virtuales ---
+# Carpetas donde se instalan las librerías (pesan mucho y no se suben)
+venv/
+env/
+.venv/
+virtualenv/
+
+# --- IDEs y Editores ---
+# Configuraciones de VS Code (a veces tienen rutas de tu PC)
+.vscode/
+.idea/
+
+# --- Sistema Operativo ---
+# Archivos basura de Windows y Mac
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Logs y Bases de Datos locales ---
+*.log
+*.sqlite3
